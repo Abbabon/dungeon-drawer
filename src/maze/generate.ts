@@ -83,7 +83,7 @@ export function generateMaze(options: MazeOptions): Maze {
   const key = (r: number, c: number) => r * cols + c;
 
   // BFS over open passages; returns parent map (-2 = unreached, -1 = root)
-  const bfs = (fromR: number, fromC: number, blocked?: number): Int32Array => {
+  const bfs = (fromR: number, fromC: number, blocked?: ReadonlySet<number>): Int32Array => {
     const parent = new Int32Array(rows * cols).fill(-2);
     const queue: number[] = [key(fromR, fromC)];
     parent[key(fromR, fromC)] = -1;
@@ -95,7 +95,7 @@ export function generateMaze(options: MazeOptions): Maze {
         if (walls[r][c][s]) continue;
         const [dr, dc] = DELTA[s];
         const nk = key(r + dr, c + dc);
-        if (!inMask(r + dr, c + dc) || parent[nk] !== -2 || nk === blocked) continue;
+        if (!inMask(r + dr, c + dc) || parent[nk] !== -2 || blocked?.has(nk)) continue;
         parent[nk] = k;
         queue.push(nk);
       }
@@ -227,13 +227,19 @@ export function generateMaze(options: MazeOptions): Maze {
       const t = treasures.length === 1 ? 0.5 : i / (treasures.length - 1);
       const idx = Math.min(hi - 1, lo + Math.floor(t * (span - 1)));
       const [r, c] = solution[idx];
-      waypoints.push({ r, c, treasure: treasures[i] });
+      waypoints.push({ r, c, r0: r, c0: c, size: 1, treasure: treasures[i] });
     }
   }
 
   // --- open a little room around each treasure (like the book examples),
   //     but only when it keeps every treasure mandatory and decoys dead ---
   const decoys = openings.filter((o) => o.kind !== 'start' && o.kind !== 'exit');
+  const regionOf = (w: Waypoint): Set<number> => {
+    const region = new Set<number>();
+    for (let r = w.r0; r < w.r0 + w.size; r++)
+      for (let c = w.c0; c < w.c0 + w.size; c++) region.add(key(r, c));
+    return region;
+  };
   const layoutIsSafe = (): boolean => {
     const fromStart = bfs(start.r, start.c);
     if (fromStart[key(exit.r, exit.c)] === -2) return false;
@@ -241,7 +247,7 @@ export function generateMaze(options: MazeOptions): Maze {
       if (fromStart[key(d.r, d.c)] !== -2) return false; // decoy reconnected
     }
     for (const w of waypoints) {
-      const avoiding = bfs(start.r, start.c, key(w.r, w.c));
+      const avoiding = bfs(start.r, start.c, regionOf(w));
       if (avoiding[key(exit.r, exit.c)] !== -2) return false; // treasure bypassable
     }
     return true;
@@ -269,7 +275,68 @@ export function generateMaze(options: MazeOptions): Maze {
     }
   }
 
+  // --- big treasures (treasureSize > 1) get an s×s open chamber carved
+  //     around their anchor. The carve is atomic: a partially open room would
+  //     hide walls under the oversized icon, so if no placement passes the
+  //     safety check the treasure falls back to a smaller room / single cell ---
+  const requestedSize = Math.max(1, Math.min(5, Math.round(options.treasureSize ?? 1)));
+  if (requestedSize > 1) {
+    const doorCells = new Set(openings.map((o) => key(o.r, o.c)));
+    const claimed = new Set<number>();
+    for (const w of waypoints) {
+      outer: for (let size = requestedSize; size >= 2; size--) {
+        // candidate top-left corners, closest-to-centered first (deterministic)
+        const corners: { r0: number; c0: number; d: number }[] = [];
+        for (let r0 = w.r - size + 1; r0 <= w.r; r0++)
+          for (let c0 = w.c - size + 1; c0 <= w.c; c0++) {
+            const d =
+              Math.abs(r0 + (size - 1) / 2 - w.r) + Math.abs(c0 + (size - 1) / 2 - w.c);
+            corners.push({ r0, c0, d });
+          }
+        corners.sort((a, b) => a.d - b.d || a.r0 - b.r0 || a.c0 - b.c0);
+        for (const { r0, c0 } of corners) {
+          let fits = true;
+          for (let r = r0; r < r0 + size && fits; r++)
+            for (let c = c0; c < c0 + size && fits; c++)
+              if (!inMask(r, c) || doorCells.has(key(r, c)) || claimed.has(key(r, c)))
+                fits = false;
+          if (!fits) continue;
+          const undo: [number, number, Side][] = [];
+          const open = (r: number, c: number, s: Side) => {
+            if (!walls[r][c][s]) return;
+            const [dr, dc] = DELTA[s];
+            walls[r][c][s] = false;
+            walls[r + dr][c + dc][OPPOSITE[s]] = false;
+            undo.push([r, c, s]);
+          };
+          for (let r = r0; r < r0 + size; r++)
+            for (let c = c0; c < c0 + size; c++) {
+              if (c + 1 < c0 + size) open(r, c, 'E');
+              if (r + 1 < r0 + size) open(r, c, 'S');
+            }
+          w.r0 = r0;
+          w.c0 = c0;
+          w.size = size;
+          if (layoutIsSafe()) {
+            for (let r = r0; r < r0 + size; r++)
+              for (let c = c0; c < c0 + size; c++) claimed.add(key(r, c));
+            break outer;
+          }
+          for (const [r, c, s] of undo) {
+            const [dr, dc] = DELTA[s];
+            walls[r][c][s] = true;
+            walls[r + dr][c + dc][OPPOSITE[s]] = true;
+          }
+          w.r0 = w.r;
+          w.c0 = w.c;
+          w.size = 1;
+        }
+      }
+    }
+  }
+
   for (const w of waypoints) {
+    if (w.size > 1) continue; // big rooms are already carved
     for (const s of SIDES) {
       const [dr, dc] = DELTA[s];
       const nr = w.r + dr;

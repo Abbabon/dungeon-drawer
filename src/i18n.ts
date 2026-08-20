@@ -30,6 +30,7 @@ export interface Strings {
   uploadPictures: string;
   uploadHint: string;
   howMany: string;
+  treasureSize: string;
   treasuresHint: string;
   tryAnother: string;
   peekSolution: string;
@@ -69,6 +70,7 @@ export const STRINGS: Record<Lang, Strings> = {
     uploadPictures: '📷 Add your own pictures',
     uploadHint: 'Family photos, drawings, pets… they become the treasures in the maze.',
     howMany: 'How many?',
+    treasureSize: 'How big?',
     treasuresHint: 'The path to the exit passes through every treasure.',
     tryAnother: '🎲 Try another',
     peekSolution: 'Peek at solution',
@@ -106,6 +108,7 @@ export const STRINGS: Record<Lang, Strings> = {
     uploadPictures: '📷 הוסיפו תמונות משלכם',
     uploadHint: 'תמונות משפחה, ציורים, חיות מחמד… הן יהפכו לאוצרות במבוך.',
     howMany: 'כמה?',
+    treasureSize: 'כמה גדולים?',
     treasuresHint: 'הדרך ליציאה עוברת דרך כל אוצר.',
     tryAnother: '🎲 נסו עוד אחד',
     peekSolution: 'הצצה לפתרון',
@@ -143,6 +146,7 @@ export const STRINGS: Record<Lang, Strings> = {
     uploadPictures: '📷 Añade tus propias fotos',
     uploadHint: 'Fotos de familia, dibujos, mascotas… se convierten en los tesoros del laberinto.',
     howMany: '¿Cuántos?',
+    treasureSize: '¿Qué tamaño?',
     treasuresHint: 'El camino a la salida pasa por todos los tesoros.',
     tryAnother: '🎲 Probar otro',
     peekSolution: 'Ver la solución',
@@ -180,6 +184,7 @@ export const STRINGS: Record<Lang, Strings> = {
     uploadPictures: '📷 Ajoutez vos propres images',
     uploadHint: 'Photos de famille, dessins, animaux… ils deviennent les trésors du labyrinthe.',
     howMany: 'Combien ?',
+    treasureSize: 'Quelle taille ?',
     treasuresHint: 'Le chemin vers la sortie passe par chaque trésor.',
     tryAnother: '🎲 Un autre !',
     peekSolution: 'Voir la solution',
@@ -217,6 +222,7 @@ export const STRINGS: Record<Lang, Strings> = {
     uploadPictures: '📷 Eigene Bilder hinzufügen',
     uploadHint: 'Familienfotos, Zeichnungen, Haustiere… sie werden zu den Schätzen im Labyrinth.',
     howMany: 'Wie viele?',
+    treasureSize: 'Wie groß?',
     treasuresHint: 'Der Weg zum Ausgang führt durch jeden Schatz.',
     tryAnother: '🎲 Noch eins!',
     peekSolution: 'Lösung ansehen',

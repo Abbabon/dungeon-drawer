@@ -29,6 +29,7 @@ function mazeProps(options: MazeOptions): Props {
     shape: options.shape,
     doors: options.entrances + options.exits,
     treasures: options.treasures.length,
+    treasureSize: options.treasureSize ?? 1,
     customPictures: options.treasures.some((t) => t.kind === 'image'),
   };
 }

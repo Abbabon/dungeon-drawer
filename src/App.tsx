@@ -48,6 +48,7 @@ export default function App() {
   const [themeId, setThemeId] = useState('treasure');
   const [customImages, setCustomImages] = useState<string[]>([]);
   const [treasureCount, setTreasureCount] = useState(3);
+  const [treasureSize, setTreasureSize] = useState(1);
   const [seed, setSeed] = useState(() => Math.floor(Math.random() * 1e9));
   const [title, setTitle] = useState(() => STRINGS[detectLang()].defaultMazeTitle);
   const [showSolution, setShowSolution] = useState(false);
@@ -81,8 +82,8 @@ export default function App() {
   }, [themeId, customImages, treasureCount]);
 
   const options: MazeOptions = useMemo(
-    () => ({ seed, difficulty, shape, entrances, exits, treasures }),
-    [seed, difficulty, shape, entrances, exits, treasures],
+    () => ({ seed, difficulty, shape, entrances, exits, treasures, treasureSize }),
+    [seed, difficulty, shape, entrances, exits, treasures, treasureSize],
   );
 
   const maze = useMemo(() => generateMaze(options), [options]);
@@ -260,6 +261,16 @@ export default function App() {
                 max={5}
                 value={treasureCount}
                 onChange={(e) => setTreasureCount(Number(e.target.value))}
+              />
+            </label>
+            <label className="row">
+              {t.treasureSize} <strong>{treasureSize}×{treasureSize}</strong>
+              <input
+                type="range"
+                min={1}
+                max={5}
+                value={treasureSize}
+                onChange={(e) => setTreasureSize(Number(e.target.value))}
               />
             </label>
             <p className="hint">{t.treasuresHint}</p>
