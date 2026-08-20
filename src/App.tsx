@@ -6,6 +6,7 @@ import { renderMazePage } from './render/draw';
 import { fileToTreasureDataUrl, loadTreasureImages, mazeTreasures } from './render/images';
 import { downloadBookPdf, downloadMazePdf } from './pdf';
 import { detectLang, LANGS, RTL_LANGS, STRINGS, type Lang } from './i18n';
+import { analytics } from './analytics';
 
 interface TreasureTheme {
   id: string;
@@ -67,6 +68,7 @@ export default function App() {
     if (defaults.some((s) => s.defaultMazeTitle === title)) setTitle(STRINGS[next].defaultMazeTitle);
     if (defaults.some((s) => s.defaultBookTitle === bookTitle)) setBookTitle(STRINGS[next].defaultBookTitle);
     setLang(next);
+    analytics.languageChanged(next);
   };
 
   const treasures: Treasure[] = useMemo(() => {
@@ -105,7 +107,13 @@ export default function App() {
 
   const shuffle = () => setSeed(Math.floor(Math.random() * 1e9));
 
+  const reroll = () => {
+    analytics.mazeRerolled(options);
+    shuffle();
+  };
+
   const addToBook = () => {
+    analytics.bookMazeAdded(options, book.length + 1);
     setBook((b) => [...b, { id: nextId++, title, options }]);
     shuffle();
   };
@@ -117,6 +125,7 @@ export default function App() {
     const urls = await Promise.all([...files].map((f) => fileToTreasureDataUrl(f).catch(() => null)));
     const good = urls.filter((u): u is string => !!u);
     if (good.length) {
+      analytics.picturesUploaded(good.length);
       setCustomImages((imgs) => [...imgs, ...good]);
       setThemeId('custom');
       setTreasureCount((n) => Math.max(n, 1));
@@ -269,19 +278,25 @@ export default function App() {
 
         <main className="preview-pane">
           <div className="preview-actions">
-            <button className="big-btn" onClick={shuffle}>{t.tryAnother}</button>
+            <button className="big-btn" onClick={reroll}>{t.tryAnother}</button>
             <label className="toggle">
               <input
                 type="checkbox"
                 checked={showSolution}
-                onChange={(e) => setShowSolution(e.target.checked)}
+                onChange={(e) => {
+                  if (e.target.checked) analytics.solutionPeeked();
+                  setShowSolution(e.target.checked);
+                }}
               />
               {t.peekSolution}
             </label>
             <span className="spacer" />
             <button
               className="big-btn accent"
-              onClick={() => void downloadMazePdf(maze, title, withSolutionPage, t)}
+              onClick={() => {
+                analytics.pdfDownloaded(options, withSolutionPage);
+                void downloadMazePdf(maze, title, withSolutionPage, t);
+              }}
             >
               {t.downloadPdf}
             </button>
@@ -325,14 +340,15 @@ export default function App() {
             <button
               className="big-btn accent"
               disabled={!book.length}
-              onClick={() =>
+              onClick={() => {
+                analytics.bookDownloaded(book.length, bookSolutions);
                 void downloadBookPdf(
                   bookTitle,
                   book.map((e) => ({ maze: generateMaze(e.options), title: e.title })),
                   bookSolutions,
                   t,
-                )
-              }
+                );
+              }}
             >
               {t.downloadBook}
             </button>

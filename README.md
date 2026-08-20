@@ -111,6 +111,18 @@ firebase init hosting   # pick a project, keep "dist"
 firebase deploy
 ```
 
+## Analytics
+
+Vercel Web Analytics (`@vercel/analytics/react`, cookieless) tracks page views plus a small set of custom funnel events (`src/analytics.ts`):
+
+```
+visit → engage (maze_rerolled · solution_peeked · pictures_uploaded)
+      → convert (pdf_downloaded)
+      → deepen (book_maze_added → book_downloaded)
+```
+
+Events carry low-cardinality props (difficulty, shape, treasure/door counts, whether custom pictures are used, solution-page opt-in, book size, language) so the funnel can be segmented by configuration in the Vercel dashboard without exploding event cardinality.
+
 ## Notes
 
 - The `examples/` folder holds reference photos of a commercial maze book used to define the feature set; it is deliberately not committed.
