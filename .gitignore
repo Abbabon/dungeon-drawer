@@ -1,0 +1,15 @@
+# dependencies / build
+node_modules/
+dist/
+
+# local env & tooling
+*.local
+.vercel/
+.firebase/
+*.log
+
+# OS
+.DS_Store
+
+# reference photos of a commercial maze book — not for publication
+examples/
