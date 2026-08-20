@@ -51,7 +51,7 @@ export interface MazeOptions {
   entrances: number; // total entrance arrows (1 real + decoys)
   exits: number; // total exit arrows (1 real + decoys)
   treasures: Treasure[]; // placed on the solution path, in order
-  /** cells per side each treasure occupies (1–3); >1 carves an open room around it */
+  /** cells per side each treasure occupies (1–5); >1 carves an open room around it */
   treasureSize?: number;
 }
 

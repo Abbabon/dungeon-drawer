@@ -279,7 +279,7 @@ export function generateMaze(options: MazeOptions): Maze {
   //     around their anchor. The carve is atomic: a partially open room would
   //     hide walls under the oversized icon, so if no placement passes the
   //     safety check the treasure falls back to a smaller room / single cell ---
-  const requestedSize = Math.max(1, Math.min(3, Math.round(options.treasureSize ?? 1)));
+  const requestedSize = Math.max(1, Math.min(5, Math.round(options.treasureSize ?? 1)));
   if (requestedSize > 1) {
     const doorCells = new Set(openings.map((o) => key(o.r, o.c)));
     const claimed = new Set<number>();

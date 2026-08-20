@@ -268,7 +268,7 @@ export default function App() {
               <input
                 type="range"
                 min={1}
-                max={3}
+                max={5}
                 value={treasureSize}
                 onChange={(e) => setTreasureSize(Number(e.target.value))}
               />
