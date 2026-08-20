@@ -1,8 +1,17 @@
 # 🏰 Dungeon Drawer
 
+**▶ Play with it live: [dungeon-drawer.vercel.app](https://dungeon-drawer.vercel.app/)**
+
 A friendly, fully client-side web tool for parents: generate printable mazes ("dungeons") for kids, preview and reroll them until they're just right, and download them as crisp A4 PDFs — single pages or a whole maze book with a cover.
 
 No backend, no accounts, no data leaves the browser.
+
+![The Dungeon Drawer app: difficulty, shape, doors and treasure controls next to a live A4 maze preview](docs/app.png)
+
+<p align="center">
+  <img src="docs/maze-heart.png" width="47%" alt="Heart-shaped maze with the solution overlay shown" />
+  <img src="docs/maze-star.png" width="47%" alt="Star-shaped maze, printable A4 page" />
+</p>
 
 ## Quick start
 
