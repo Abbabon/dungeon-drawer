@@ -12,6 +12,15 @@ npm run preview  # serve the production build locally
 
 There is no test script or lint config. `npm run build` is the correctness gate — TypeScript is strict with `noUnusedLocals`/`noUnusedParameters`, so unused code fails the build. For ad-hoc verification scripts (e.g. regenerating the maze invariant suite), run them with `npx tsx <script>`; `tsx` is a devDependency for exactly this.
 
+## Feature pipeline
+
+`main` is production (Vercel deploys it on push). For any user-facing change:
+
+1. Branch: `git checkout -b feature/<name>`.
+2. Implement; `npm run build` must pass, and regenerate the invariant suite if generation logic changed.
+3. Commit (as Abbabon) and push the branch; the user tests it (`npm run dev` locally or the Vercel preview deploy) before it merges.
+4. Merge to `main` only after the user approves. Trivial fixes (copy, typos) may go straight to `main` when the user says so.
+
 ## What this is
 
 A fully client-side React + Vite app that generates printable kids' mazes and exports them as A4 PDFs (single pages or a multi-maze "book"). No backend; uploaded treasure images stay in browser memory as data URLs.

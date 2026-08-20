@@ -34,8 +34,13 @@ export type Treasure =
   | { kind: 'image'; src: string };
 
 export interface Waypoint {
+  /** anchor cell on the solution path */
   r: number;
   c: number;
+  /** room block the treasure occupies: top-left corner + side length in cells */
+  r0: number;
+  c0: number;
+  size: number;
   treasure: Treasure;
 }
 
@@ -46,6 +51,8 @@ export interface MazeOptions {
   entrances: number; // total entrance arrows (1 real + decoys)
   exits: number; // total exit arrows (1 real + decoys)
   treasures: Treasure[]; // placed on the solution path, in order
+  /** cells per side each treasure occupies (1–3); >1 carves an open room around it */
+  treasureSize?: number;
 }
 
 export interface Maze {
