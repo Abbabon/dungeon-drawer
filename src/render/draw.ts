@@ -159,11 +159,22 @@ function drawTreasure(
   images?: ImageMap,
 ): void {
   if (treasure.kind === 'emoji') {
-    // no backing disc — the glyph is transparent and fits inside its cell
+    // no backing disc — the glyph is transparent and fits inside its cell.
+    // Emoji ink is rarely centered on the font's metrics, so center the
+    // measured glyph bounds instead of trusting textAlign/textBaseline.
     ctx.font = `${cell * 0.82}px ${FONT}`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText(treasure.value, cx, cy + cell * 0.04);
+    const m = ctx.measureText(treasure.value);
+    const inkW = m.actualBoundingBoxLeft + m.actualBoundingBoxRight;
+    const inkH = m.actualBoundingBoxAscent + m.actualBoundingBoxDescent;
+    if (inkW > 0 && inkH > 0) {
+      const dx = (m.actualBoundingBoxLeft - m.actualBoundingBoxRight) / 2;
+      const dy = (m.actualBoundingBoxAscent - m.actualBoundingBoxDescent) / 2;
+      ctx.fillText(treasure.value, cx + dx, cy + dy);
+    } else {
+      ctx.fillText(treasure.value, cx, cy + cell * 0.04);
+    }
     return;
   }
   const img = images?.get(treasure.src);
