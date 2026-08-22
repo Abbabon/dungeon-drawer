@@ -49,6 +49,7 @@ export interface Strings {
   solution: string;
   mazesInside: (n: number) => string;
   remove: string;
+  bookNotSaved: string;
 }
 
 export const STRINGS: Record<Lang, Strings> = {
@@ -89,6 +90,7 @@ export const STRINGS: Record<Lang, Strings> = {
     solution: 'Solution',
     mazesInside: (n) => `${n} maze${n === 1 ? '' : 's'} inside`,
     remove: 'Remove',
+    bookNotSaved: 'This book is too big to keep for next time — download it before you close the tab.',
   },
   he: {
     appTitle: 'מצייר מבוכים',
@@ -127,6 +129,7 @@ export const STRINGS: Record<Lang, Strings> = {
     solution: 'פתרון',
     mazesInside: (n) => `${n} מבוכים בפנים`,
     remove: 'הסרה',
+    bookNotSaved: 'החוברת גדולה מדי כדי להישמר לפעם הבאה — הורידו אותה לפני שתסגרו את החלון.',
   },
   es: {
     appTitle: 'Dungeon Drawer',
@@ -165,6 +168,7 @@ export const STRINGS: Record<Lang, Strings> = {
     solution: 'Solución',
     mazesInside: (n) => `${n} laberinto${n === 1 ? '' : 's'} dentro`,
     remove: 'Quitar',
+    bookNotSaved: 'Este libro es demasiado grande para guardarlo para la próxima vez: descárgalo antes de cerrar la pestaña.',
   },
   fr: {
     appTitle: 'Dungeon Drawer',
@@ -203,6 +207,7 @@ export const STRINGS: Record<Lang, Strings> = {
     solution: 'Solution',
     mazesInside: (n) => `${n} labyrinthe${n === 1 ? '' : 's'} à l’intérieur`,
     remove: 'Retirer',
+    bookNotSaved: 'Ce livre est trop lourd pour être conservé pour la prochaine fois — téléchargez-le avant de fermer l’onglet.',
   },
   de: {
     appTitle: 'Dungeon Drawer',
@@ -241,6 +246,7 @@ export const STRINGS: Record<Lang, Strings> = {
     solution: 'Lösung',
     mazesInside: (n) => `${n} Labyrinth${n === 1 ? '' : 'e'} drin`,
     remove: 'Entfernen',
+    bookNotSaved: 'Dieses Buch ist zu groß, um es für das nächste Mal zu speichern — ladet es herunter, bevor ihr den Tab schließt.',
   },
 };
 
@@ -248,3 +254,69 @@ export function detectLang(): Lang {
   const nav = (navigator.languages?.[0] ?? navigator.language ?? 'en').slice(0, 2).toLowerCase();
   return (LANGS.some((l) => l.id === nav) ? nav : 'en') as Lang;
 }
+
+/** Head / link-preview copy. Crawlers never run our JS, so this is baked into
+ *  one static HTML page per locale at build time (see `src/share.ts`). */
+export interface ShareMeta {
+  /** <title> and og:title / twitter:title */
+  htmlTitle: string;
+  /** <meta name="description"> — a touch longer, for search results */
+  description: string;
+  /** og:description / twitter:description — tighter, for chat previews */
+  ogDescription: string;
+  ogImageAlt: string;
+  /** og:locale, e.g. "he_IL" */
+  ogLocale: string;
+}
+
+export const SHARE_META: Record<Lang, ShareMeta> = {
+  en: {
+    htmlTitle: 'Dungeon Drawer — printable mazes for kids',
+    description:
+      'Design mazes together with your kids: pick a difficulty, a shape, treasures to find — even your own photos — then print a page or a whole maze book. Free, no signup.',
+    ogDescription:
+      'Pick a difficulty, a shape and treasures — even your own photos — then print a maze page or a whole maze book. Free, no signup.',
+    ogImageAlt:
+      'A heart-shaped printable maze next to the words: Dungeon Drawer, printable mazes for kids',
+    ogLocale: 'en_US',
+  },
+  he: {
+    htmlTitle: 'מצייר מבוכים — מבוכים להדפסה לילדים',
+    description:
+      'מעצבים מבוך יחד עם הילדים: בוחרים רמת קושי, צורה ואוצרות למצוא — אפילו תמונות משלכם — ואז מדפיסים עמוד אחד או חוברת שלמה. חינם, בלי הרשמה.',
+    ogDescription:
+      'בוחרים רמת קושי, צורה ואוצרות — אפילו תמונות משלכם — ומדפיסים עמוד מבוך או חוברת שלמה. חינם, בלי הרשמה.',
+    ogImageAlt: 'מבוך להדפסה בצורת לב לצד הכיתוב: Dungeon Drawer — מבוכים להדפסה לילדים',
+    ogLocale: 'he_IL',
+  },
+  es: {
+    htmlTitle: 'Dungeon Drawer — laberintos para imprimir para niños',
+    description:
+      'Diseña laberintos con tus hijos: elige dificultad, forma y tesoros por encontrar —incluso tus propias fotos— e imprime una página o un libro entero. Gratis, sin registro.',
+    ogDescription:
+      'Elige dificultad, forma y tesoros —incluso tus propias fotos— e imprime una página de laberinto o un libro entero. Gratis, sin registro.',
+    ogImageAlt:
+      'Un laberinto imprimible en forma de corazón junto a las palabras: Dungeon Drawer, laberintos para imprimir para niños',
+    ogLocale: 'es_ES',
+  },
+  fr: {
+    htmlTitle: 'Dungeon Drawer — labyrinthes à imprimer pour enfants',
+    description:
+      'Créez des labyrinthes avec vos enfants : choisissez une difficulté, une forme, des trésors à trouver — même vos propres photos — puis imprimez une page ou tout un livre. Gratuit, sans inscription.',
+    ogDescription:
+      'Choisissez une difficulté, une forme et des trésors — même vos propres photos — puis imprimez une page de labyrinthe ou tout un livre. Gratuit, sans inscription.',
+    ogImageAlt:
+      'Un labyrinthe à imprimer en forme de cœur à côté des mots : Dungeon Drawer, labyrinthes à imprimer pour enfants',
+    ogLocale: 'fr_FR',
+  },
+  de: {
+    htmlTitle: 'Dungeon Drawer — Labyrinthe zum Ausdrucken für Kinder',
+    description:
+      'Gestaltet Labyrinthe gemeinsam mit euren Kindern: Schwierigkeit, Form und Schätze auswählen — sogar eigene Fotos — und dann eine Seite oder ein ganzes Buch ausdrucken. Kostenlos, ohne Anmeldung.',
+    ogDescription:
+      'Schwierigkeit, Form und Schätze wählen — sogar eigene Fotos — und eine Labyrinth-Seite oder ein ganzes Buch ausdrucken. Kostenlos, ohne Anmeldung.',
+    ogImageAlt:
+      'Ein herzförmiges Labyrinth zum Ausdrucken neben den Worten: Dungeon Drawer, Labyrinthe zum Ausdrucken für Kinder',
+    ogLocale: 'de_DE',
+  },
+};

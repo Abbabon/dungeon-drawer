@@ -44,7 +44,21 @@ Any change to the pipeline must preserve these. The historical invariant suite g
 
 **Difficulty** is a three-knob table in `src/maze/types.ts`: grid size, braid fraction, and route-length quantile ("windiness") — not just size.
 
-**i18n** (`src/i18n.ts`): plain typed dictionaries, no framework. 5 languages including Hebrew with full RTL (`document.dir` flips at runtime). Adding a language = new `Lang` id + `LANGS` row + `Strings` entry; the compiler flags anything missing. Printed PDF pages are localized too.
+**i18n** (`src/i18n.ts`): plain typed dictionaries, no framework. 5 languages including Hebrew with full RTL (`document.dir` flips at runtime). Adding a language = new `Lang` id + `LANGS` row + `Strings` entry + `SHARE_META` entry, then regenerate the share cards (below); the compiler flags anything missing. Printed PDF pages are localized too.
+
+**Locale routing & link previews** (`src/share.ts` + the `localePages()` plugin in `vite.config.ts`): English is served at `/`, every other language at `/<lang>/`. The plugin emits one real HTML page per locale at build time — same JS bundle, but its own `<title>`, description, `og:*`/`twitter:*`, canonical and hreflang alternates — because link-preview crawlers never run our JS. At runtime the app resolves the language from `?lang=xx` → path prefix → `dd_lang` cookie → `navigator`, then normalizes the URL to the path form and re-applies the share tags via `applyShareHead`. `vercel.json` redirects `/he` → `/he/` so the share URL is always the canonical one.
+
+**Share cards** (`public/og.png`, `public/og-<lang>.png`): one 1200×630 card per locale, drawn by `scripts/og/` using the app's own `drawMaze`, so the card and the printed page come from the same renderer. Regenerate after touching `LANGS`, `appTitle` or `tagline`:
+
+```bash
+node scripts/og/write-server.mjs           # terminal 1 — writes into public/
+npm run dev                                # terminal 2
+open http://localhost:5173/scripts/og/index.html
+```
+
+The page renders all locales and POSTs each PNG to the writer; the RTL layout is mirrored. `scripts/` is type-checked by `npm run build` but never bundled (the only Rollup input is the root `index.html`).
+
+**Persistence** (`src/persist.ts`): the chosen language is a `dd_lang` cookie (small, and readable by an edge redirect later); the maze book is `localStorage` under `dd_book_v1` — books carry uploaded photos as data URLs and blow past the 4 KB cookie limit. Only `{options, seed}` snapshots are stored, so a restored book re-generates byte-identical mazes; stored payloads are validated on load because localStorage is user-editable.
 
 **Analytics** (`src/analytics.ts`): Vercel Web Analytics custom funnel events. Keep event props low-cardinality (enums/counts only).
 

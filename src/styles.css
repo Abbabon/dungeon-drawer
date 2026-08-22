@@ -110,6 +110,7 @@ body {
 .row input[type="range"] { flex: 1; accent-color: var(--accent); }
 
 .hint { color: var(--muted); font-size: 0.85rem; margin: 8px 0 0; }
+.hint.warn { color: var(--accent-dark); font-weight: 600; }
 
 .text-input {
   width: 100%; font: inherit; font-size: 1rem; padding: 8px 12px;

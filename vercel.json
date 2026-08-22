@@ -1,0 +1,10 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "redirects": [
+    {
+      "source": "/:lang(he|es|fr|de)",
+      "destination": "/:lang/",
+      "permanent": true
+    }
+  ]
+}

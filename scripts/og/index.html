@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Dungeon Drawer — share card generator</title>
+    <style>
+      body { margin: 0; padding: 24px; background: #22222a; color: #eee;
+             font: 14px 'Avenir Next', system-ui, sans-serif; }
+      canvas { width: 600px; height: 315px; display: block; margin: 8px 0 20px;
+               box-shadow: 0 8px 30px rgba(0,0,0,.4); }
+      #status { white-space: pre-wrap; font-family: ui-monospace, monospace; }
+    </style>
+  </head>
+  <body>
+    <div id="status">rendering…</div>
+    <div id="cards"></div>
+    <script type="module" src="./generate.ts"></script>
+  </body>
+</html>

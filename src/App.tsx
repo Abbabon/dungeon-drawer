@@ -5,7 +5,9 @@ import { DIFFICULTIES } from './maze/types';
 import { renderMazePage } from './render/draw';
 import { fileToTreasureDataUrl, loadTreasureImages, mazeTreasures } from './render/images';
 import { downloadBookPdf, downloadMazePdf } from './pdf';
-import { detectLang, LANGS, RTL_LANGS, STRINGS, type Lang } from './i18n';
+import { detectLang, LANGS, STRINGS, type Lang } from './i18n';
+import { applyShareHead, langFromLocation, pathForLang } from './share';
+import { loadState, readLangCookie, saveState, writeLangCookie } from './persist';
 import { analytics } from './analytics';
 
 interface TreasureTheme {
@@ -37,31 +39,68 @@ interface BookEntryState {
 
 let nextId = 1;
 
+/** URL wins (a shared link is explicit), then the cookie, then the browser. */
+const INITIAL_LANG: Lang = langFromLocation(window.location) ?? readLangCookie() ?? detectLang();
+const STORED = loadState();
+
 export default function App() {
-  const [lang, setLang] = useState<Lang>(() => detectLang());
+  const [lang, setLang] = useState<Lang>(INITIAL_LANG);
   const t = STRINGS[lang];
 
   const [difficulty, setDifficulty] = useState<DifficultyId>('medium');
   const [shape, setShape] = useState<ShapeId>('rectangle');
   const [entrances, setEntrances] = useState(2);
   const [exits, setExits] = useState(1);
-  const [themeId, setThemeId] = useState('treasure');
-  const [customImages, setCustomImages] = useState<string[]>([]);
+  // if their own pictures came back from last time, that's where they left off
+  const [themeId, setThemeId] = useState(STORED?.images.length ? 'custom' : 'treasure');
+  const [customImages, setCustomImages] = useState<string[]>(() => STORED?.images ?? []);
   const [treasureCount, setTreasureCount] = useState(3);
   const [treasureSize, setTreasureSize] = useState(1);
   const [seed, setSeed] = useState(() => Math.floor(Math.random() * 1e9));
-  const [title, setTitle] = useState(() => STRINGS[detectLang()].defaultMazeTitle);
+  const [title, setTitle] = useState(() => STRINGS[INITIAL_LANG].defaultMazeTitle);
   const [showSolution, setShowSolution] = useState(false);
   const [withSolutionPage, setWithSolutionPage] = useState(true);
 
-  const [book, setBook] = useState<BookEntryState[]>([]);
-  const [bookTitle, setBookTitle] = useState(() => STRINGS[detectLang()].defaultBookTitle);
-  const [bookSolutions, setBookSolutions] = useState(true);
+  const [book, setBook] = useState<BookEntryState[]>(() =>
+    (STORED?.book.entries ?? []).map((e) => ({ id: nextId++, title: e.title, options: e.options })),
+  );
+  const [bookTitle, setBookTitle] = useState(
+    () => STORED?.book.title || STRINGS[INITIAL_LANG].defaultBookTitle,
+  );
+  const [bookSolutions, setBookSolutions] = useState(STORED?.book.solutions ?? true);
+  const [bookTooBig, setBookTooBig] = useState(false);
 
+  // Language lives in three places at once: the document (lang/dir + share
+  // tags), a cookie for the next visit, and the URL so a copied link carries it.
   useEffect(() => {
-    document.documentElement.lang = lang;
-    document.documentElement.dir = RTL_LANGS.has(lang) ? 'rtl' : 'ltr';
+    applyShareHead(lang);
+    writeLangCookie(lang);
+    const url = new URL(window.location.href);
+    url.pathname = pathForLang(lang);
+    url.searchParams.delete('lang'); // normalize ?lang=he into /he/
+    const next = url.pathname + url.search + url.hash;
+    if (next !== window.location.pathname + window.location.search + window.location.hash) {
+      window.history.replaceState(null, '', next);
+    }
   }, [lang]);
+
+  // The book is only {options, seed} snapshots, so re-generating it tomorrow
+  // reproduces the exact same mazes. Uploaded pictures ride along so the
+  // treasure strip is still there too.
+  useEffect(() => {
+    const stored = saveState({
+      book: {
+        title: bookTitle,
+        solutions: bookSolutions,
+        entries: book.map(({ title: entryTitle, options: entryOptions }) => ({
+          title: entryTitle,
+          options: entryOptions,
+        })),
+      },
+      images: customImages,
+    });
+    setBookTooBig(!stored && (book.length > 0 || customImages.length > 0));
+  }, [book, bookTitle, bookSolutions, customImages]);
 
   const switchLang = (next: Lang) => {
     // keep default titles in sync unless the user typed their own
@@ -365,6 +404,7 @@ export default function App() {
             </button>
           </div>
         </div>
+        {bookTooBig && <p className="hint warn">{t.bookNotSaved}</p>}
         {book.length === 0 ? (
           <p className="hint">{t.bookHint}</p>
         ) : (
