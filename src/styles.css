@@ -29,6 +29,15 @@ body {
 .topbar h1 { margin: 0; font-size: 2rem; }
 .topbar p { margin: 4px 0 0; color: var(--muted); }
 
+/* On narrow screens the absolutely positioned selector overlaps the title:
+   drop it back into normal flow above the heading. */
+@media (max-width: 640px) {
+  .topbar { padding-top: 0; }
+  .lang-row { position: static; display: flex; justify-content: flex-end; margin-bottom: 6px; }
+  .topbar h1 { font-size: 1.55rem; }
+  .topbar p { font-size: 0.92rem; }
+}
+
 .layout {
   display: grid;
   grid-template-columns: 330px 1fr;
