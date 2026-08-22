@@ -4,7 +4,7 @@
 
 A friendly, fully client-side web tool for parents: generate printable mazes ("dungeons") for kids, preview and reroll them until they're just right, and download them as crisp A4 PDFs — single pages or a whole maze book with a cover.
 
-No backend, no accounts, no data leaves the browser.
+No backend, no accounts, no data leaves the browser — including the language and maze book it now remembers for you.
 
 ![The Dungeon Drawer app: difficulty, shape, doors and treasure controls next to a live A4 maze preview](docs/app.png)
 
@@ -22,7 +22,7 @@ npm run build    # typecheck + production build into dist/
 npm run preview  # serve the production build locally
 ```
 
-Requires Node 18+.
+Requires Node 18+. `npm run build` emits one HTML page per language into `dist/` — see [Languages and URLs](#languages-and-urls). Regenerating the share images is a separate, occasional step: [Regenerating the share cards](#regenerating-the-share-cards).
 
 ## Features
 
@@ -48,7 +48,7 @@ Requires Node 18+.
 
 Each locale is a **real static HTML page** emitted at build time (the `localePages()` plugin in `vite.config.ts`), sharing one JS bundle but carrying its own `<title>`, meta description, Open Graph / Twitter tags, canonical URL and `hreflang` alternates. Link-preview crawlers — WhatsApp, Slack, Facebook, X — don't run JavaScript, so this is the only way a shared link shows up in the right language.
 
-The preview image is localized too: one 1200×630 card per language, drawn by `scripts/og/` with the app's own maze renderer, mirrored for Hebrew.
+The preview image is localized too: one 1200×630 card per language, drawn with the app's own maze renderer and mirrored for Hebrew ([how to regenerate them](#regenerating-the-share-cards)).
 
 <p align="center">
   <img src="public/og.png" width="47%" alt="English share card: Dungeon Drawer, printable mazes for kids, next to a heart-shaped maze" />
@@ -57,10 +57,12 @@ The preview image is localized too: one 1200×630 card per language, drawn by `s
 
 ## What's remembered
 
-Nothing is uploaded; both of these live in your own browser.
+Nothing is uploaded. Both of these live in your own browser and never travel anywhere.
 
 - **Language** — a `dd_lang` cookie, one year.
-- **Your maze book** — `localStorage` (`dd_book_v1`): the book title, the solutions-at-the-back toggle, and one `{options, seed}` snapshot per maze. Because generation is deterministic, reopening the tab re-generates exactly the mazes you had. Books with uploaded photos can outgrow the storage quota — if that happens the app says so and asks you to download the PDF before closing.
+- **Your maze book and your pictures** — `localStorage` under `dd_state_v1`: the book title, the solutions-at-the-back toggle, one `{options, seed}` snapshot per maze, and any pictures you uploaded. Because generation is deterministic, reopening the tab re-generates *exactly* the mazes you had rather than approximations of them: a maze made of emoji treasures costs a few hundred bytes to remember, not a saved image. (A maze built from your own photos does carry those photos, which is what can eventually hit the quota below.)
+
+A book is deliberately not kept in a cookie: uploaded photos are data URLs, far past the ~4 KB a cookie holds, and there is no reason to send a maze book to a server on every request. If the browser does refuse the write (storage quota, private mode), the app says so and asks you to download the PDF before closing, instead of quietly forgetting.
 
 ## How it works
 
@@ -104,14 +106,38 @@ Draw order is part of correctness: solution line → treasures → **walls on to
 
 ### Localization (`src/i18n.ts`)
 
-Plain typed dictionaries — no i18n framework. `detectLang()` picks the browser language on first load; the picker in the header switches at runtime and flips `document.dir` for RTL. To add a language: add a `Lang` id, a row in `LANGS`, and a `Strings` entry (the compiler will list everything that's missing).
+Plain typed dictionaries — no i18n framework. The picker in the header switches at runtime, flips `document.dir` for RTL, and re-points the URL, the cookie and the head tags at the new locale.
+
+The language is resolved once at startup, in this order:
+
+1. `?lang=xx` in the query string — an explicit override;
+2. the `/<lang>/` path prefix — how a shared link carries its language;
+3. the `dd_lang` cookie — what you chose last time;
+4. `navigator.language` — first visit;
+5. English.
+
+To add a language: add a `Lang` id, a row in `LANGS`, a `Strings` entry and a `SHARE_META` entry (the compiler will list everything that's missing), then regenerate the share cards.
+
+### Regenerating the share cards
+
+`public/og.png` and `public/og-<lang>.png` are generated, not hand-drawn — one 1200×630 card per language, laid out by `scripts/og/` and drawn with the app's own `drawMaze`, so the card and the printed page come from the same renderer. Rerun after changing `LANGS`, `appTitle` or `tagline`:
+
+```bash
+node scripts/og/write-server.mjs           # terminal 1 — writes into public/
+npm run dev                                # terminal 2
+open http://localhost:5173/scripts/og/index.html
+```
+
+The page renders every locale, mirrors the layout for Hebrew, and POSTs each PNG to the little writer server. `scripts/` is type-checked by `npm run build` but never bundled — the only Rollup input is the root `index.html`.
 
 ## Project structure
 
 ```
 src/
   App.tsx             UI (controls, preview, book shelf)
-  i18n.ts             languages, strings, RTL handling
+  i18n.ts             languages, UI strings, share copy, RTL handling
+  share.ts            locale ↔ URL mapping, head/OG tags (build + runtime)
+  persist.ts          language cookie, localStorage book + pictures
   pdf.ts              single-maze and book PDF assembly (jsPDF)
   styles.css          app styling
   maze/
@@ -121,15 +147,18 @@ src/
   render/
     draw.ts           canvas renderer (preview/thumbnail/PDF pages)
     images.ts         image loading, caching, upload downscaling
+scripts/og/           share-card generator (dev only, never bundled)
+vite.config.ts        build config + the per-locale HTML page emitter
+vercel.json           /he → /he/ redirects, so shares hit the canonical page
 ```
 
 ## Deployment
 
-The build output (`dist/`) is fully static — any static host works.
+The build output (`dist/`) is fully static — any static host works. It is multi-page: `dist/index.html` plus `dist/he/index.html`, `dist/es/index.html` and so on, all pointing at the same JS bundle.
 
 **Vercel** (recommended): push to GitHub and import the repo at vercel.com (auto-detects Vite, deploys on every push), or run `npx vercel` for a one-off CLI deploy. The free Hobby plan covers personal, non-commercial use.
 
-**Firebase Hosting**: a `firebase.json` is included (`public: dist`, long-cache asset headers):
+**Firebase Hosting**: a `firebase.json` is included (`public: dist`, long-cache asset headers). Note that the `/he` → `/he/` redirect lives in `vercel.json`; on another host you'd want the equivalent rule so link previews resolve to the canonical locale page.
 
 ```bash
 npm run build
@@ -152,4 +181,4 @@ Events carry low-cardinality props (difficulty, shape, treasure/door counts, whe
 ## Notes
 
 - The `examples/` folder holds reference photos of a commercial maze book used to define the feature set; it is deliberately not committed.
-- Uploaded treasure pictures live only in browser memory (as data URLs baked into the generated PDFs); nothing is uploaded anywhere.
+- Uploaded treasure pictures never leave the device: they're data URLs, baked into the generated PDFs and saved to your own browser's `localStorage` so they're still there next time. Clearing site data clears them.

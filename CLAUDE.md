@@ -10,6 +10,8 @@ npm run build    # tsc --noEmit (strict typecheck) + vite build → dist/
 npm run preview  # serve the production build locally
 ```
 
+No test script and no lint config. `npm run build` is the correctness gate; `scripts/` is type-checked by it too. Regenerating the share cards is a separate manual step — see **Share cards** below.
+
 There is no test script or lint config. `npm run build` is the correctness gate — TypeScript is strict with `noUnusedLocals`/`noUnusedParameters`, so unused code fails the build. For ad-hoc verification scripts (e.g. regenerating the maze invariant suite), run them with `npx tsx <script>`; `tsx` is a devDependency for exactly this.
 
 ## Feature pipeline
@@ -17,17 +19,19 @@ There is no test script or lint config. `npm run build` is the correctness gate 
 `main` is production (Vercel deploys it on push). For any user-facing change:
 
 1. Branch: `git checkout -b feature/<name>`.
-2. Implement; `npm run build` must pass, and regenerate the invariant suite if generation logic changed.
+2. Implement; `npm run build` must pass, regenerate the invariant suite if generation logic changed, and regenerate the share cards if `LANGS`/`appTitle`/`tagline` changed.
 3. Commit (as Abbabon) and push the branch; the user tests it (`npm run dev` locally or the Vercel preview deploy) before it merges.
 4. Merge to `main` only after the user approves. Trivial fixes (copy, typos) may go straight to `main` when the user says so.
 
 ## What this is
 
-A fully client-side React + Vite app that generates printable kids' mazes and exports them as A4 PDFs (single pages or a multi-maze "book"). No backend; uploaded treasure images stay in browser memory as data URLs.
+A fully client-side React + Vite app that generates printable kids' mazes and exports them as A4 PDFs (single pages or a multi-maze "book"). No backend and no network calls beyond loading the app: uploaded treasure images become data URLs, and the only thing that outlives the tab is the user's own browser storage (see **Persistence**).
 
 ## Architecture
 
 Data flow: `App.tsx` (UI state) → `maze/generate.ts` (pure, seeded generation) → `render/draw.ts` (one canvas renderer for preview, thumbnails, and PDF pages) → `pdf.ts` (jsPDF assembly).
+
+Two cross-cutting modules sit beside that pipeline: `share.ts` (locale ↔ URL mapping and head/OG tags, shared by the build and the runtime) and `persist.ts` (the language cookie and the localStorage snapshot).
 
 **Determinism is load-bearing.** Generation is seeded (mulberry32); the same `{options, seed}` always reproduces the same maze. Book entries are stored only as `{options, seed}` snapshots and re-generated on demand — never break reproducibility of `generateMaze`.
 
@@ -58,11 +62,17 @@ open http://localhost:5173/scripts/og/index.html
 
 The page renders all locales and POSTs each PNG to the writer; the RTL layout is mirrored. `scripts/` is type-checked by `npm run build` but never bundled (the only Rollup input is the root `index.html`).
 
-**Persistence** (`src/persist.ts`): the chosen language is a `dd_lang` cookie (small, and readable by an edge redirect later); the maze book is `localStorage` under `dd_book_v1` — books carry uploaded photos as data URLs and blow past the 4 KB cookie limit. Only `{options, seed}` snapshots are stored, so a restored book re-generates byte-identical mazes; stored payloads are validated on load because localStorage is user-editable.
+**Persistence** (`src/persist.ts`). Two stores, chosen on purpose:
+
+- **Language** — a `dd_lang` cookie, one year, `SameSite=Lax`. Small, and readable outside JS if an edge redirect ever fronts the locale pages.
+- **Book + uploaded pictures** — `localStorage` under `dd_state_v1`, shaped `{ book: { title, solutions, entries }, images }`. Deliberately *not* a cookie: photos ride along as data URLs and blow past the ~4 KB limit, and a book has no business being sent up with every request.
+
+Entries stay `{options, seed}` snapshots, so a restored book re-generates byte-identical mazes — this is the same determinism contract as above, now load-bearing across sessions too. Everything read back is validated (`parseOptions`, `isDataImage`) because localStorage is user-editable; a bad payload is dropped, never fed to `generateMaze`. `saveState` returns `false` when the browser refuses (quota, private mode) and the UI surfaces `Strings.bookNotSaved` rather than silently forgetting.
 
 **Analytics** (`src/analytics.ts`): Vercel Web Analytics custom funnel events. Keep event props low-cardinality (enums/counts only).
 
 ## Notes
 
 - `examples/` holds reference photos (HEIC) of a commercial maze book — deliberately not committed; don't add it to git.
-- Deployed on Vercel (static `dist/`); `firebase.json` exists as an alternative host config.
+- Deployed on Vercel (static `dist/`). The build output is now multi-page: `dist/index.html` plus `dist/<lang>/index.html` for each non-English locale, all sharing one JS bundle.
+- `firebase.json` exists as an alternative host config, but only `vercel.json` carries the `/he` → `/he/` redirect; another host would need its own equivalent.
