@@ -34,7 +34,33 @@ Requires Node 18+.
 | **Treasures on the path** | Emoji themes (treasure, animals, space, sweets, ocean) **or your own uploaded pictures** (photos, drawings, pets). The only route to the exit passes through every treasure — this is a verified invariant, not a hope. |
 | **Preview & reroll** | Live A4 preview, 🎲 reroll, optional solution overlay. |
 | **PDF export** | Single maze (~300 dpi A4, optional solution page) or a **maze book**: cover page, one maze per page, optional solutions at the back. |
-| **5 languages** | English, עברית (full RTL layout), Español, Français, Deutsch. Printed pages localize too (difficulty label, solution pages, cover subtitle). |
+| **5 languages** | English, עברית (full RTL layout), Español, Français, Deutsch. Printed pages localize too (difficulty label, solution pages, cover subtitle). Each language has its own URL and its own link preview — see [Languages and URLs](#languages-and-urls). |
+| **Picks up where you left off** | Your language and your maze book survive a reload, a closed tab, and tomorrow morning. Nothing leaves the browser. |
+
+## Languages and URLs
+
+| URL | What you get |
+| --- | --- |
+| `/` | English |
+| `/he/`, `/es/`, `/fr/`, `/de/` | that language, RTL layout included for Hebrew |
+| `?lang=he` on any URL | an explicit override, normalized to `/he/` in the address bar |
+| no hint at all | your chosen language from last time (a `dd_lang` cookie), otherwise the browser's |
+
+Each locale is a **real static HTML page** emitted at build time (the `localePages()` plugin in `vite.config.ts`), sharing one JS bundle but carrying its own `<title>`, meta description, Open Graph / Twitter tags, canonical URL and `hreflang` alternates. Link-preview crawlers — WhatsApp, Slack, Facebook, X — don't run JavaScript, so this is the only way a shared link shows up in the right language.
+
+The preview image is localized too: one 1200×630 card per language, drawn by `scripts/og/` with the app's own maze renderer, mirrored for Hebrew.
+
+<p align="center">
+  <img src="public/og.png" width="47%" alt="English share card: Dungeon Drawer, printable mazes for kids, next to a heart-shaped maze" />
+  <img src="public/og-he.png" width="47%" alt="Hebrew share card, mirrored right-to-left" />
+</p>
+
+## What's remembered
+
+Nothing is uploaded; both of these live in your own browser.
+
+- **Language** — a `dd_lang` cookie, one year.
+- **Your maze book** — `localStorage` (`dd_book_v1`): the book title, the solutions-at-the-back toggle, and one `{options, seed}` snapshot per maze. Because generation is deterministic, reopening the tab re-generates exactly the mazes you had. Books with uploaded photos can outgrow the storage quota — if that happens the app says so and asks you to download the PDF before closing.
 
 ## How it works
 
