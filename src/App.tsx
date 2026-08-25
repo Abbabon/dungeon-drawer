@@ -59,7 +59,7 @@ export default function App() {
 
   const [difficulty, setDifficulty] = useState<DifficultyId>('medium');
   const [shape, setShape] = useState<ShapeId>('rectangle');
-  const [entrances, setEntrances] = useState(2);
+  const [entrances, setEntrances] = useState(1);
   const [exits, setExits] = useState(1);
   // if their own pictures came back from last time, that's where they left off
   const [themeId, setThemeId] = useState(STORED?.images.length ? 'custom' : 'treasure');

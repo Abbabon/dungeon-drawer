@@ -10,6 +10,11 @@ const WALL_COLOR = '#33333d';
 const SOLUTION_COLOR = '#ff7b72';
 const FONT = "'Avenir Next', 'Avenir', 'Segoe UI', 'Trebuchet MS', system-ui, sans-serif";
 
+/** How much of its cell (or room) an uploaded picture's disc fills. Smaller
+ *  than the emoji glyph on purpose: it leaves a ring of white inside the room
+ *  so kids can draw around the photo instead of over it. */
+const PICTURE_DISC = 0.77;
+
 /** Images for treasure pictures, keyed by their src. */
 export type ImageMap = Map<string, CanvasImageSource>;
 
@@ -179,7 +184,7 @@ function drawTreasure(
   }
   const img = images?.get(treasure.src);
   if (!img) return;
-  const d = cell * 0.86;
+  const d = cell * PICTURE_DISC;
   ctx.save();
   ctx.beginPath();
   ctx.arc(cx, cy, d / 2, 0, Math.PI * 2);
@@ -267,6 +272,7 @@ export function renderCoverPage(
   const total = shown.length * size + (shown.length - 1) * gap;
   let x = W / 2 - total / 2 + size / 2;
   for (const t of shown) {
+    // icons are sized off their cell, so ask for a cell that draws them ~`size` big
     drawTreasure(ctx, t, x, H * 0.64, size / 0.86, images);
     x += size + gap;
   }
