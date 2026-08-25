@@ -54,6 +54,8 @@ export interface Strings {
   updatePage: (n: number) => string;
   editingPage: (n: number) => string;
   stopEditing: string;
+  preparingPdf: string;
+  preparingPage: (done: number, total: number) => string;
 }
 
 export const STRINGS: Record<Lang, Strings> = {
@@ -99,6 +101,8 @@ export const STRINGS: Record<Lang, Strings> = {
     updatePage: (n) => `💾 Save into page ${n}`,
     editingPage: (n) => `Editing page ${n} of the book`,
     stopEditing: 'Stop editing',
+    preparingPdf: 'Preparing…',
+    preparingPage: (done, total) => `Preparing… page ${done} of ${total}`,
   },
   he: {
     appTitle: 'מצייר מבוכים',
@@ -142,6 +146,8 @@ export const STRINGS: Record<Lang, Strings> = {
     updatePage: (n) => `💾 שמירה לעמוד ${n}`,
     editingPage: (n) => `עורכים את עמוד ${n} בחוברת`,
     stopEditing: 'סיום עריכה',
+    preparingPdf: 'מכינים…',
+    preparingPage: (done, total) => `מכינים… עמוד ${done} מתוך ${total}`,
   },
   es: {
     appTitle: 'Dungeon Drawer',
@@ -185,6 +191,8 @@ export const STRINGS: Record<Lang, Strings> = {
     updatePage: (n) => `💾 Guardar en la página ${n}`,
     editingPage: (n) => `Editando la página ${n} del libro`,
     stopEditing: 'Dejar de editar',
+    preparingPdf: 'Preparando…',
+    preparingPage: (done, total) => `Preparando… página ${done} de ${total}`,
   },
   fr: {
     appTitle: 'Dungeon Drawer',
@@ -228,6 +236,8 @@ export const STRINGS: Record<Lang, Strings> = {
     updatePage: (n) => `💾 Enregistrer dans la page ${n}`,
     editingPage: (n) => `Édition de la page ${n} du livre`,
     stopEditing: 'Arrêter l’édition',
+    preparingPdf: 'Préparation…',
+    preparingPage: (done, total) => `Préparation… page ${done} sur ${total}`,
   },
   de: {
     appTitle: 'Dungeon Drawer',
@@ -271,6 +281,8 @@ export const STRINGS: Record<Lang, Strings> = {
     updatePage: (n) => `💾 In Seite ${n} speichern`,
     editingPage: (n) => `Seite ${n} des Buchs bearbeiten`,
     stopEditing: 'Bearbeiten beenden',
+    preparingPdf: 'Wird vorbereitet…',
+    preparingPage: (done, total) => `Wird vorbereitet… Seite ${done} von ${total}`,
   },
 };
 

@@ -48,6 +48,8 @@ Any change to the pipeline must preserve these. The historical invariant suite g
 
 **PDF assembly** (`src/pdf.ts`): every page is a canvas PNG handed to `jsPDF.addImage` with an explicit `'SLOW'` compression argument. jsPDF stores image data *uncompressed* when that argument is omitted — 26 MB of raw pixels per A4 page, which once produced a 250 MB seven-maze book. Deflate is lossless, so the print is unaffected; never drop the argument.
 
+Both export functions take an optional `onProgress(done, total)` and yield a frame (`nextFrame()`) before each page — page rendering blocks the main thread, so without the yield the counter would never paint. `App.tsx` drives the busy label from it and locks re-entry with a **ref**, not the `building` state: `disabled` only reaches the DOM on the next render, so a state-only guard still lets two same-tick clicks start two renders of the same document.
+
 **Book pages are editable.** Adding to the book does not reroll the editor, and clicking a shelf thumbnail loads that page's `{options, seed}` back into the controls (`selectPage` in `App.tsx`). Edits only reach the stored page when the user presses save — so the shelf never changes under them. Loading maps `options.treasures` back to a theme button via `themeIdOf`; a page whose treasures are no longer in the palette keeps the current theme rather than guessing.
 
 **Difficulty** is a three-knob table in `src/maze/types.ts`: grid size, braid fraction, and route-length quantile ("windiness") — not just size.

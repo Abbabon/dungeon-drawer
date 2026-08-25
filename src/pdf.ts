@@ -18,7 +18,16 @@ const PDF_PIXEL_WIDTH = 2480; // ~300 dpi for A4
  */
 const PDF_IMAGE_COMPRESSION = 'SLOW';
 
-function pageToPdf(pdf: jsPDF, draw: (canvas: HTMLCanvasElement) => void, first: boolean): void {
+/** Draws one A4 page onto a fresh canvas. */
+type DrawPage = (canvas: HTMLCanvasElement) => void;
+
+/**
+ * Reports how many pages are finished. `total` is 0 while treasure pictures are
+ * still loading and we don't yet know how many pages there will be.
+ */
+export type PdfProgress = (done: number, total: number) => void;
+
+function pageToPdf(pdf: jsPDF, draw: DrawPage, first: boolean): void {
   const canvas = document.createElement('canvas');
   draw(canvas);
   if (!first) pdf.addPage();
@@ -34,6 +43,30 @@ function pageToPdf(pdf: jsPDF, draw: (canvas: HTMLCanvasElement) => void, first:
   );
 }
 
+function nextFrame(): Promise<void> {
+  return new Promise((resolve) => {
+    requestAnimationFrame(() => setTimeout(resolve, 0));
+  });
+}
+
+/**
+ * Render every page into the document, reporting progress as we go.
+ *
+ * Drawing and compressing a 2480 px page blocks the main thread for a good
+ * fraction of a second, so we hand the browser a frame to paint in before each
+ * one. Without that yield the counter would never reach the screen — it would
+ * sit at zero and then jump straight to "saved", which is exactly the silence
+ * that makes people press the button a second time.
+ */
+async function renderPages(pdf: jsPDF, pages: DrawPage[], onProgress?: PdfProgress): Promise<void> {
+  for (let i = 0; i < pages.length; i++) {
+    onProgress?.(i, pages.length);
+    await nextFrame();
+    pageToPdf(pdf, pages[i], i === 0);
+  }
+  onProgress?.(pages.length, pages.length);
+}
+
 export interface BookEntry {
   maze: Maze;
   title: string;
@@ -44,24 +77,25 @@ export async function downloadMazePdf(
   title: string,
   includeSolution: boolean,
   t: Strings,
+  onProgress?: PdfProgress,
 ): Promise<void> {
   const images = await loadTreasureImages(mazeTreasures([maze]));
   const difficultyLabel = t.difficulty[maze.options.difficulty];
-  const pdf = new jsPDF({ unit: 'mm', format: 'a4' });
-  pageToPdf(pdf, (c) => renderMazePage(c, maze, PDF_PIXEL_WIDTH, { title, difficultyLabel, images }), true);
+  const pages: DrawPage[] = [
+    (c) => renderMazePage(c, maze, PDF_PIXEL_WIDTH, { title, difficultyLabel, images }),
+  ];
   if (includeSolution) {
-    pageToPdf(
-      pdf,
-      (c) =>
-        renderMazePage(c, maze, PDF_PIXEL_WIDTH, {
-          title: `${title} — ${t.solution}`,
-          difficultyLabel,
-          showSolution: true,
-          images,
-        }),
-      false,
+    pages.push((c) =>
+      renderMazePage(c, maze, PDF_PIXEL_WIDTH, {
+        title: `${title} — ${t.solution}`,
+        difficultyLabel,
+        showSolution: true,
+        images,
+      }),
     );
   }
+  const pdf = new jsPDF({ unit: 'mm', format: 'a4' });
+  await renderPages(pdf, pages, onProgress);
   pdf.save(`${safeName(title)}.pdf`);
 }
 
@@ -70,9 +104,9 @@ export async function downloadBookPdf(
   entries: BookEntry[],
   includeSolutions: boolean,
   t: Strings,
+  onProgress?: PdfProgress,
 ): Promise<void> {
   const images = await loadTreasureImages(mazeTreasures(entries.map((e) => e.maze)));
-  const pdf = new jsPDF({ unit: 'mm', format: 'a4' });
   const treasures = mazeTreasures(entries.map((e) => e.maze));
   const seen = new Set<string>();
   const unique = treasures.filter((tr) => {
@@ -82,40 +116,37 @@ export async function downloadBookPdf(
     return true;
   });
   if (!unique.length) unique.push({ kind: 'emoji', value: '🏰' }, { kind: 'emoji', value: '⭐' });
-  pageToPdf(
-    pdf,
-    (c) => renderCoverPage(c, PDF_PIXEL_WIDTH, bookTitle, t.mazesInside(entries.length), unique, images),
-    true,
-  );
+
+  const pages: DrawPage[] = [
+    (c) =>
+      renderCoverPage(c, PDF_PIXEL_WIDTH, bookTitle, t.mazesInside(entries.length), unique, images),
+  ];
   entries.forEach((entry, i) => {
-    pageToPdf(
-      pdf,
-      (c) =>
-        renderMazePage(c, entry.maze, PDF_PIXEL_WIDTH, {
-          title: entry.title,
-          difficultyLabel: t.difficulty[entry.maze.options.difficulty],
-          pageNumber: i + 1,
-          images,
-        }),
-      false,
+    pages.push((c) =>
+      renderMazePage(c, entry.maze, PDF_PIXEL_WIDTH, {
+        title: entry.title,
+        difficultyLabel: t.difficulty[entry.maze.options.difficulty],
+        pageNumber: i + 1,
+        images,
+      }),
     );
   });
   if (includeSolutions) {
     entries.forEach((entry, i) => {
-      pageToPdf(
-        pdf,
-        (c) =>
-          renderMazePage(c, entry.maze, PDF_PIXEL_WIDTH, {
-            title: `${t.solution} — ${entry.title}`,
-            difficultyLabel: t.difficulty[entry.maze.options.difficulty],
-            showSolution: true,
-            pageNumber: entries.length + i + 1,
-            images,
-          }),
-        false,
+      pages.push((c) =>
+        renderMazePage(c, entry.maze, PDF_PIXEL_WIDTH, {
+          title: `${t.solution} — ${entry.title}`,
+          difficultyLabel: t.difficulty[entry.maze.options.difficulty],
+          showSolution: true,
+          pageNumber: entries.length + i + 1,
+          images,
+        }),
       );
     });
   }
+
+  const pdf = new jsPDF({ unit: 'mm', format: 'a4' });
+  await renderPages(pdf, pages, onProgress);
   pdf.save(`${safeName(bookTitle)}.pdf`);
 }
 

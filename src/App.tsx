@@ -4,7 +4,7 @@ import type { DifficultyId, MazeOptions, ShapeId, Treasure } from './maze/types'
 import { DIFFICULTIES } from './maze/types';
 import { renderMazePage } from './render/draw';
 import { fileToTreasureDataUrl, loadTreasureImages, mazeTreasures } from './render/images';
-import { downloadBookPdf, downloadMazePdf } from './pdf';
+import { downloadBookPdf, downloadMazePdf, type PdfProgress } from './pdf';
 import { detectLang, LANGS, STRINGS, type Lang } from './i18n';
 import { applyShareHead, langFromLocation, pathForLang } from './share';
 import { loadState, readLangCookie, saveState, writeLangCookie } from './persist';
@@ -81,6 +81,11 @@ export default function App() {
   const [bookTooBig, setBookTooBig] = useState(false);
   /** the book page the editor is currently standing in for, if any */
   const [selectedId, setSelectedId] = useState<number | null>(null);
+  /** a PDF being built right now — which button started it, and how far in */
+  const [building, setBuilding] = useState<{ what: 'page' | 'book'; done: number; total: number } | null>(
+    null,
+  );
+  const buildingRef = useRef(false);
 
   // Language lives in three places at once: the document (lang/dir + share
   // tags), a cookie for the next visit, and the URL so a copied link carries it.
@@ -203,6 +208,34 @@ export default function App() {
     if (selectedId === null) return;
     analytics.bookPageUpdated(options, book.length);
     setBook((b) => b.map((e) => (e.id === selectedId ? { ...e, title, options } : e)));
+  };
+
+  /**
+   * Building a PDF takes a few seconds and gives no feedback of its own, so the
+   * buttons go busy for the duration. That is the point: a disabled button with
+   * a live page count is what stops a second click from starting a second,
+   * competing render of the same document.
+   */
+  const buildPdf = async (what: 'page' | 'book', run: (onProgress: PdfProgress) => Promise<void>) => {
+    // The ref, not the state, is the lock: `disabled` only reaches the DOM on
+    // the next render, so two clicks in the same tick would both still see
+    // `building === null` and start two renders of the same document.
+    if (buildingRef.current) return;
+    buildingRef.current = true;
+    setBuilding({ what, done: 0, total: 0 });
+    try {
+      await run((done, total) => setBuilding({ what, done, total }));
+    } finally {
+      buildingRef.current = false;
+      setBuilding(null);
+    }
+  };
+
+  const buildingLabel = (what: 'page' | 'book') => {
+    if (building?.what !== what) return null;
+    const { done, total } = building;
+    // `done` counts finished pages, so the one being drawn right now is done + 1
+    return total > 1 ? t.preparingPage(Math.min(done + 1, total), total) : t.preparingPdf;
   };
 
   const removeFromBook = (id: number) => {
@@ -393,12 +426,20 @@ export default function App() {
             <span className="spacer" />
             <button
               className="big-btn accent"
+              disabled={!!building}
+              aria-busy={building?.what === 'page'}
               onClick={() => {
                 analytics.pdfDownloaded(options, withSolutionPage);
-                void downloadMazePdf(maze, title, withSolutionPage, t);
+                void buildPdf('page', (onProgress) =>
+                  downloadMazePdf(maze, title, withSolutionPage, t, onProgress),
+                );
               }}
             >
-              {t.downloadPdf}
+              {buildingLabel('page') ? (
+                <><span className="spinner" aria-hidden="true" />{buildingLabel('page')}</>
+              ) : (
+                t.downloadPdf
+              )}
             </button>
             <button className="big-btn" onClick={addToBook}>{t.addToBook}</button>
           </div>
@@ -448,18 +489,26 @@ export default function App() {
             </label>
             <button
               className="big-btn accent"
-              disabled={!book.length}
+              disabled={!book.length || !!building}
+              aria-busy={building?.what === 'book'}
               onClick={() => {
                 analytics.bookDownloaded(book.length, bookSolutions);
-                void downloadBookPdf(
-                  bookTitle,
-                  book.map((e) => ({ maze: generateMaze(e.options), title: e.title })),
-                  bookSolutions,
-                  t,
+                void buildPdf('book', (onProgress) =>
+                  downloadBookPdf(
+                    bookTitle,
+                    book.map((e) => ({ maze: generateMaze(e.options), title: e.title })),
+                    bookSolutions,
+                    t,
+                    onProgress,
+                  ),
                 );
               }}
             >
-              {t.downloadBook}
+              {buildingLabel('book') ? (
+                <><span className="spinner" aria-hidden="true" />{buildingLabel('book')}</>
+              ) : (
+                t.downloadBook
+              )}
             </button>
           </div>
         </div>
