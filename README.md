@@ -32,7 +32,8 @@ Requires Node 18+. `npm run build` emits one HTML page per language into `dist/`
 | **Shape cutouts** | Classic rectangle, circle, heart, star, hexagon. Doors always sit on the shape outline. |
 | **Multiple doors** | Up to 3 entrances and 3 exits — but only one entrance and one exit actually connect. The rest are guaranteed dead ends. |
 | **Treasures on the path** | Emoji themes (treasure, animals, space, sweets, ocean) **or your own uploaded pictures** (photos, drawings, pets). The only route to the exit passes through every treasure — this is a verified invariant, not a hope. |
-| **Preview & reroll** | Live A4 preview, 🎲 reroll, optional solution overlay. |
+| **Preview & reroll** | Live A4 preview, 🎲 reroll, optional solution overlay. Adding a maze to the book leaves the editor alone — nothing is rerolled behind your back. |
+| **Editable book pages** | Click any page on the shelf to load it back into the editor exactly as it was, tweak it, and save it into that page — or leave it and add a new one. |
 | **PDF export** | Single maze (~300 dpi A4, optional solution page) or a **maze book**: cover page, one maze per page, optional solutions at the back. |
 | **5 languages** | English, עברית (full RTL layout), Español, Français, Deutsch. Printed pages localize too (difficulty label, solution pages, cover subtitle). Each language has its own URL and its own link preview — see [Languages and URLs](#languages-and-urls). |
 | **Picks up where you left off** | Your language and your maze book survive a reload, a closed tab, and tomorrow morning. Nothing leaves the browser. |
@@ -101,6 +102,8 @@ Rectangle stretches the base size ×1.3 vertically for a portrait page; other sh
 ### Rendering & PDF (`src/render/draw.ts`, `src/pdf.ts`)
 
 One canvas renderer draws everything: the on-screen preview (900 px wide), book-shelf thumbnails (300 px), and PDF pages (2480 px ≈ 300 dpi A4, embedded as PNG via jsPDF). What you preview is exactly what prints.
+
+Page images are handed to jsPDF with explicit `'SLOW'` compression (deflate level 9, Paeth predictor). This is not a micro-optimization: jsPDF stores image data **uncompressed** by default, so an A4 page costs 26 MB of raw pixels and a seven-maze book once came out at 250 MB. With compression the same book is around 2 MB, and because deflate is lossless the print is unchanged.
 
 Draw order is part of correctness: solution line → treasures → **walls on top**. Treasure icons are sized to fit inside a single cell and never cover a wall, so the printed maze is always solvable by exactly what's visible. Emoji are drawn transparently (no backing disc); uploaded pictures are circle-cropped with a thin ring and downscaled to ≤384 px data URLs at upload time (`src/render/images.ts`).
 

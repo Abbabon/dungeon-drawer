@@ -46,6 +46,10 @@ Any change to the pipeline must preserve these. The historical invariant suite g
 
 **Rendering** (`src/render/draw.ts`): the same renderer draws the 900 px preview, 300 px book thumbnails, and 2480 px (~300 dpi A4) PDF pages, so preview = print. Draw order is part of correctness: solution line → treasures → walls on top. Treasure icons must fit inside one cell and never cover a wall.
 
+**PDF assembly** (`src/pdf.ts`): every page is a canvas PNG handed to `jsPDF.addImage` with an explicit `'SLOW'` compression argument. jsPDF stores image data *uncompressed* when that argument is omitted — 26 MB of raw pixels per A4 page, which once produced a 250 MB seven-maze book. Deflate is lossless, so the print is unaffected; never drop the argument.
+
+**Book pages are editable.** Adding to the book does not reroll the editor, and clicking a shelf thumbnail loads that page's `{options, seed}` back into the controls (`selectPage` in `App.tsx`). Edits only reach the stored page when the user presses save — so the shelf never changes under them. Loading maps `options.treasures` back to a theme button via `themeIdOf`; a page whose treasures are no longer in the palette keeps the current theme rather than guessing.
+
 **Difficulty** is a three-knob table in `src/maze/types.ts`: grid size, braid fraction, and route-length quantile ("windiness") — not just size.
 
 **i18n** (`src/i18n.ts`): plain typed dictionaries, no framework. 5 languages including Hebrew with full RTL (`document.dir` flips at runtime). Adding a language = new `Lang` id + `LANGS` row + `Strings` entry + `SHARE_META` entry, then regenerate the share cards (below); the compiler flags anything missing. Printed PDF pages are localized too.

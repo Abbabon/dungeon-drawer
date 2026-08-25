@@ -6,11 +6,32 @@ import { loadTreasureImages, mazeTreasures } from './render/images';
 
 const PDF_PIXEL_WIDTH = 2480; // ~300 dpi for A4
 
+/**
+ * jsPDF re-encodes an RGBA canvas PNG into a raw RGB image plus an alpha mask,
+ * and stores both *uncompressed* unless a compression level is passed — 26 MB
+ * of pixels per A4 page, which is how a seven-maze book once weighed 250 MB.
+ *
+ * 'SLOW' (deflate level 9 with a Paeth predictor) is the right trade here: a
+ * fraction of a second per page, and on white-dominated line art it takes that
+ * same book to ~2 MB. It is lossless, so the print is still exactly what the
+ * preview showed. Don't drop this argument — the default is "no compression".
+ */
+const PDF_IMAGE_COMPRESSION = 'SLOW';
+
 function pageToPdf(pdf: jsPDF, draw: (canvas: HTMLCanvasElement) => void, first: boolean): void {
   const canvas = document.createElement('canvas');
   draw(canvas);
   if (!first) pdf.addPage();
-  pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, PAGE_W_MM, PAGE_H_MM);
+  pdf.addImage(
+    canvas.toDataURL('image/png'),
+    'PNG',
+    0,
+    0,
+    PAGE_W_MM,
+    PAGE_H_MM,
+    undefined,
+    PDF_IMAGE_COMPRESSION,
+  );
 }
 
 export interface BookEntry {

@@ -50,6 +50,10 @@ export interface Strings {
   mazesInside: (n: number) => string;
   remove: string;
   bookNotSaved: string;
+  openPage: string;
+  updatePage: (n: number) => string;
+  editingPage: (n: number) => string;
+  stopEditing: string;
 }
 
 export const STRINGS: Record<Lang, Strings> = {
@@ -91,6 +95,10 @@ export const STRINGS: Record<Lang, Strings> = {
     mazesInside: (n) => `${n} maze${n === 1 ? '' : 's'} inside`,
     remove: 'Remove',
     bookNotSaved: 'This book is too big to keep for next time — download it before you close the tab.',
+    openPage: 'Open this page in the editor',
+    updatePage: (n) => `💾 Save into page ${n}`,
+    editingPage: (n) => `Editing page ${n} of the book`,
+    stopEditing: 'Stop editing',
   },
   he: {
     appTitle: 'מצייר מבוכים',
@@ -130,6 +138,10 @@ export const STRINGS: Record<Lang, Strings> = {
     mazesInside: (n) => `${n} מבוכים בפנים`,
     remove: 'הסרה',
     bookNotSaved: 'החוברת גדולה מדי כדי להישמר לפעם הבאה — הורידו אותה לפני שתסגרו את החלון.',
+    openPage: 'פתיחת העמוד בעורך',
+    updatePage: (n) => `💾 שמירה לעמוד ${n}`,
+    editingPage: (n) => `עורכים את עמוד ${n} בחוברת`,
+    stopEditing: 'סיום עריכה',
   },
   es: {
     appTitle: 'Dungeon Drawer',
@@ -169,6 +181,10 @@ export const STRINGS: Record<Lang, Strings> = {
     mazesInside: (n) => `${n} laberinto${n === 1 ? '' : 's'} dentro`,
     remove: 'Quitar',
     bookNotSaved: 'Este libro es demasiado grande para guardarlo para la próxima vez: descárgalo antes de cerrar la pestaña.',
+    openPage: 'Abrir esta página en el editor',
+    updatePage: (n) => `💾 Guardar en la página ${n}`,
+    editingPage: (n) => `Editando la página ${n} del libro`,
+    stopEditing: 'Dejar de editar',
   },
   fr: {
     appTitle: 'Dungeon Drawer',
@@ -208,6 +224,10 @@ export const STRINGS: Record<Lang, Strings> = {
     mazesInside: (n) => `${n} labyrinthe${n === 1 ? '' : 's'} à l’intérieur`,
     remove: 'Retirer',
     bookNotSaved: 'Ce livre est trop lourd pour être conservé pour la prochaine fois — téléchargez-le avant de fermer l’onglet.',
+    openPage: 'Ouvrir cette page dans l’éditeur',
+    updatePage: (n) => `💾 Enregistrer dans la page ${n}`,
+    editingPage: (n) => `Édition de la page ${n} du livre`,
+    stopEditing: 'Arrêter l’édition',
   },
   de: {
     appTitle: 'Dungeon Drawer',
@@ -247,6 +267,10 @@ export const STRINGS: Record<Lang, Strings> = {
     mazesInside: (n) => `${n} Labyrinth${n === 1 ? '' : 'e'} drin`,
     remove: 'Entfernen',
     bookNotSaved: 'Dieses Buch ist zu groß, um es für das nächste Mal zu speichern — ladet es herunter, bevor ihr den Tab schließt.',
+    openPage: 'Diese Seite im Editor öffnen',
+    updatePage: (n) => `💾 In Seite ${n} speichern`,
+    editingPage: (n) => `Seite ${n} des Buchs bearbeiten`,
+    stopEditing: 'Bearbeiten beenden',
   },
 };
 

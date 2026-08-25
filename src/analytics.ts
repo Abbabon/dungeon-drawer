@@ -60,6 +60,11 @@ export const analytics = {
     send('book_maze_added', { ...mazeProps(options), bookSize });
   },
 
+  /** deepening: user went back and reworked a page already in the book */
+  bookPageUpdated(options: MazeOptions, bookSize: number): void {
+    send('book_page_updated', { ...mazeProps(options), bookSize });
+  },
+
   /** deepest conversion: a whole book PDF left the site */
   bookDownloaded(mazeCount: number, withSolutions: boolean): void {
     send('book_downloaded', { mazes: mazeCount, withSolutions });
