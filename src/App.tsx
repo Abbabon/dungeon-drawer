@@ -39,6 +39,16 @@ interface BookEntryState {
 
 let nextId = 1;
 
+/** Which theme button a stored page's treasures came from, or null if we can't
+ *  tell — no treasures, an emoji that has since left the palette, or pictures
+ *  when the user has deleted the strip the "My pictures" button hangs off. */
+function themeIdOf(treasures: Treasure[], customImages: string[]): string | null {
+  const first = treasures[0];
+  if (!first) return null;
+  if (first.kind === 'image') return customImages.length ? 'custom' : null;
+  return THEMES.find((th) => th.emojis.includes(first.value))?.id ?? null;
+}
+
 /** URL wins (a shared link is explicit), then the cookie, then the browser. */
 const INITIAL_LANG: Lang = langFromLocation(window.location) ?? readLangCookie() ?? detectLang();
 const STORED = loadState();
@@ -69,6 +79,8 @@ export default function App() {
   );
   const [bookSolutions, setBookSolutions] = useState(STORED?.book.solutions ?? true);
   const [bookTooBig, setBookTooBig] = useState(false);
+  /** the book page the editor is currently standing in for, if any */
+  const [selectedId, setSelectedId] = useState<number | null>(null);
 
   // Language lives in three places at once: the document (lang/dir + share
   // tags), a cookie for the next visit, and the URL so a copied link carries it.
@@ -127,6 +139,8 @@ export default function App() {
 
   const maze = useMemo(() => generateMaze(options), [options]);
 
+  const selectedIndex = book.findIndex((e) => e.id === selectedId);
+
   const previewRef = useRef<HTMLCanvasElement>(null);
   useEffect(() => {
     let cancelled = false;
@@ -152,13 +166,49 @@ export default function App() {
     shuffle();
   };
 
+  // Adding deliberately leaves the editor alone: rolling a new maze here threw
+  // away the one the user was still looking at. The new page becomes the
+  // selected one instead, so the next tweak lands on what they just added.
   const addToBook = () => {
+    const id = nextId++;
     analytics.bookMazeAdded(options, book.length + 1);
-    setBook((b) => [...b, { id: nextId++, title, options }]);
-    shuffle();
+    setBook((b) => [...b, { id, title, options }]);
+    setSelectedId(id);
   };
 
-  const removeFromBook = (id: number) => setBook((b) => b.filter((e) => e.id !== id));
+  /** Load a page back into the editor. Only the knobs travel — the maze itself
+   *  is re-generated from {options, seed}, so it comes back identical. */
+  const selectPage = (id: number) => {
+    if (id === selectedId) {
+      setSelectedId(null);
+      return;
+    }
+    const entry = book.find((e) => e.id === id);
+    if (!entry) return;
+    const o = entry.options;
+    setDifficulty(o.difficulty);
+    setShape(o.shape);
+    setEntrances(o.entrances);
+    setExits(o.exits);
+    setTreasureCount(o.treasures.length);
+    setTreasureSize(o.treasureSize ?? 1);
+    const theme = themeIdOf(o.treasures, customImages);
+    if (theme) setThemeId(theme);
+    setTitle(entry.title);
+    setSeed(o.seed);
+    setSelectedId(id);
+  };
+
+  const updateSelectedPage = () => {
+    if (selectedId === null) return;
+    analytics.bookPageUpdated(options, book.length);
+    setBook((b) => b.map((e) => (e.id === selectedId ? { ...e, title, options } : e)));
+  };
+
+  const removeFromBook = (id: number) => {
+    setBook((b) => b.filter((e) => e.id !== id));
+    if (id === selectedId) setSelectedId(null);
+  };
 
   const onUpload = async (files: FileList | null) => {
     if (!files?.length) return;
@@ -352,6 +402,15 @@ export default function App() {
             </button>
             <button className="big-btn" onClick={addToBook}>{t.addToBook}</button>
           </div>
+          {selectedIndex >= 0 && (
+            <div className="editing-note">
+              <span>{t.editingPage(selectedIndex + 1)}</span>
+              <button className="save" onClick={updateSelectedPage}>
+                {t.updatePage(selectedIndex + 1)}
+              </button>
+              <button onClick={() => setSelectedId(null)}>{t.stopEditing}</button>
+            </div>
+          )}
           <label className="toggle small">
             <input
               type="checkbox"
@@ -416,6 +475,9 @@ export default function App() {
                 index={i}
                 difficultyLabel={t.difficulty[entry.options.difficulty]}
                 removeLabel={t.remove}
+                openLabel={t.openPage}
+                selected={entry.id === selectedId}
+                onSelect={selectPage}
                 onRemove={removeFromBook}
               />
             ))}
@@ -433,12 +495,18 @@ function BookThumb({
   index,
   difficultyLabel,
   removeLabel,
+  openLabel,
+  selected,
+  onSelect,
   onRemove,
 }: {
   entry: BookEntryState;
   index: number;
   difficultyLabel: string;
   removeLabel: string;
+  openLabel: string;
+  selected: boolean;
+  onSelect: (id: number) => void;
   onRemove: (id: number) => void;
 }) {
   const ref = useRef<HTMLCanvasElement>(null);
@@ -455,8 +523,15 @@ function BookThumb({
     };
   }, [maze, entry.title, difficultyLabel]);
   return (
-    <div className="thumb">
-      <canvas ref={ref} />
+    <div className={`thumb ${selected ? 'selected' : ''}`}>
+      <button
+        className="thumb-pick"
+        title={openLabel}
+        aria-pressed={selected}
+        onClick={() => onSelect(entry.id)}
+      >
+        <canvas ref={ref} />
+      </button>
       <div className="thumb-bar">
         <span>{index + 1}. {entry.title}</span>
         <button title={removeLabel} onClick={() => onRemove(entry.id)}>✕</button>
