@@ -29,6 +29,8 @@ export interface Strings {
   myPictures: string;
   uploadPictures: string;
   uploadHint: string;
+  usePicture: string;
+  pictureToggleHint: string;
   howMany: string;
   treasureSize: string;
   treasuresHint: string;
@@ -41,6 +43,9 @@ export interface Strings {
   bookEmpty: string;
   mazeCount: (n: number) => string;
   solutionsAtBack: string;
+  includeCoverPage: string;
+  coverText: string;
+  coverTextHint: string;
   downloadBook: string;
   bookHint: string;
   footer: string;
@@ -76,6 +81,8 @@ export const STRINGS: Record<Lang, Strings> = {
     myPictures: 'My pictures',
     uploadPictures: '📷 Add your own pictures',
     uploadHint: 'Family photos, drawings, pets… they become the treasures in the maze.',
+    usePicture: 'Use this picture',
+    pictureToggleHint: 'Tap a picture to leave it in or out. Fewer pictures than treasures? They take turns.',
     howMany: 'How many?',
     treasureSize: 'How big?',
     treasuresHint: 'The path to the exit passes through every treasure.',
@@ -88,6 +95,9 @@ export const STRINGS: Record<Lang, Strings> = {
     bookEmpty: 'empty',
     mazeCount: (n) => `${n} maze${n === 1 ? '' : 's'}`,
     solutionsAtBack: 'Solutions at the back',
+    includeCoverPage: 'Start with a cover page',
+    coverText: 'Cover line',
+    coverTextHint: 'Leave the cover line empty to count the mazes for you.',
     downloadBook: '📚 Download book PDF',
     bookHint: 'Press “Add to book” to collect mazes, then download them all as one printable book with a cover page.',
     footer: 'Made for rainy afternoons ☔ — print on A4, grab a pencil, go!',
@@ -121,6 +131,8 @@ export const STRINGS: Record<Lang, Strings> = {
     myPictures: 'התמונות שלי',
     uploadPictures: '📷 הוסיפו תמונות משלכם',
     uploadHint: 'תמונות משפחה, ציורים, חיות מחמד… הן יהפכו לאוצרות במבוך.',
+    usePicture: 'להשתמש בתמונה הזו',
+    pictureToggleHint: 'לחצו על תמונה כדי לכלול או להשמיט אותה. פחות תמונות מאוצרות? הן יחזרו בתורן.',
     howMany: 'כמה?',
     treasureSize: 'כמה גדולים?',
     treasuresHint: 'הדרך ליציאה עוברת דרך כל אוצר.',
@@ -133,6 +145,9 @@ export const STRINGS: Record<Lang, Strings> = {
     bookEmpty: 'ריקה',
     mazeCount: (n) => `${n} מבוכים`,
     solutionsAtBack: 'פתרונות בסוף',
+    includeCoverPage: 'להתחיל בעמוד שער',
+    coverText: 'כיתוב בשער',
+    coverTextHint: 'השאירו את הכיתוב ריק ונספור עבורכם את המבוכים.',
     downloadBook: '📚 הורדת חוברת PDF',
     bookHint: 'לחצו על ״הוספה לחוברת״ כדי לאסוף מבוכים, ואז הורידו את כולם כחוברת אחת להדפסה עם עמוד שער.',
     footer: 'נעים לימים גשומים ☔ — מדפיסים על A4, לוקחים עיפרון, ויוצאים לדרך!',
@@ -166,6 +181,8 @@ export const STRINGS: Record<Lang, Strings> = {
     myPictures: 'Mis fotos',
     uploadPictures: '📷 Añade tus propias fotos',
     uploadHint: 'Fotos de familia, dibujos, mascotas… se convierten en los tesoros del laberinto.',
+    usePicture: 'Usar esta foto',
+    pictureToggleHint: 'Toca una foto para incluirla o dejarla fuera. ¿Menos fotos que tesoros? Se van turnando.',
     howMany: '¿Cuántos?',
     treasureSize: '¿Qué tamaño?',
     treasuresHint: 'El camino a la salida pasa por todos los tesoros.',
@@ -178,6 +195,9 @@ export const STRINGS: Record<Lang, Strings> = {
     bookEmpty: 'vacío',
     mazeCount: (n) => `${n} laberinto${n === 1 ? '' : 's'}`,
     solutionsAtBack: 'Soluciones al final',
+    includeCoverPage: 'Empezar con una portada',
+    coverText: 'Texto de portada',
+    coverTextHint: 'Deja el texto vacío y contamos los laberintos por ti.',
     downloadBook: '📚 Descargar libro en PDF',
     bookHint: 'Pulsa «Añadir al libro» para reunir laberintos y descárgalos como un libro imprimible con portada.',
     footer: 'Perfecto para tardes de lluvia ☔ — imprime en A4, coge un lápiz ¡y a jugar!',
@@ -211,6 +231,8 @@ export const STRINGS: Record<Lang, Strings> = {
     myPictures: 'Mes images',
     uploadPictures: '📷 Ajoutez vos propres images',
     uploadHint: 'Photos de famille, dessins, animaux… ils deviennent les trésors du labyrinthe.',
+    usePicture: 'Utiliser cette image',
+    pictureToggleHint: 'Touchez une image pour l’inclure ou l’exclure. Moins d’images que de trésors ? Elles se relaient.',
     howMany: 'Combien ?',
     treasureSize: 'Quelle taille ?',
     treasuresHint: 'Le chemin vers la sortie passe par chaque trésor.',
@@ -223,6 +245,9 @@ export const STRINGS: Record<Lang, Strings> = {
     bookEmpty: 'vide',
     mazeCount: (n) => `${n} labyrinthe${n === 1 ? '' : 's'}`,
     solutionsAtBack: 'Solutions à la fin',
+    includeCoverPage: 'Commencer par une couverture',
+    coverText: 'Texte de couverture',
+    coverTextHint: 'Laissez le texte vide et nous compterons les labyrinthes pour vous.',
     downloadBook: '📚 Télécharger le livre en PDF',
     bookHint: 'Appuyez sur « Ajouter au livre » pour collectionner des labyrinthes, puis téléchargez-les en un seul livre imprimable avec couverture.',
     footer: 'Parfait pour les après-midis pluvieux ☔ — imprimez en A4, prenez un crayon, c’est parti !',
@@ -256,6 +281,8 @@ export const STRINGS: Record<Lang, Strings> = {
     myPictures: 'Meine Bilder',
     uploadPictures: '📷 Eigene Bilder hinzufügen',
     uploadHint: 'Familienfotos, Zeichnungen, Haustiere… sie werden zu den Schätzen im Labyrinth.',
+    usePicture: 'Dieses Bild verwenden',
+    pictureToggleHint: 'Tippt ein Bild an, um es ein- oder auszulassen. Weniger Bilder als Schätze? Sie wechseln sich ab.',
     howMany: 'Wie viele?',
     treasureSize: 'Wie groß?',
     treasuresHint: 'Der Weg zum Ausgang führt durch jeden Schatz.',
@@ -268,6 +295,9 @@ export const STRINGS: Record<Lang, Strings> = {
     bookEmpty: 'leer',
     mazeCount: (n) => `${n} Labyrinth${n === 1 ? '' : 'e'}`,
     solutionsAtBack: 'Lösungen am Ende',
+    includeCoverPage: 'Mit einer Titelseite beginnen',
+    coverText: 'Text auf der Titelseite',
+    coverTextHint: 'Lasst den Text leer, dann zählen wir die Labyrinthe für euch.',
     downloadBook: '📚 Buch als PDF herunterladen',
     bookHint: '„Zum Buch hinzufügen“ drücken, um Labyrinthe zu sammeln — dann alles als druckbares Buch mit Titelseite herunterladen.',
     footer: 'Gemacht für Regennachmittage ☔ — auf A4 drucken, Stift schnappen, los geht’s!',

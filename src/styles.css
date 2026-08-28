@@ -91,11 +91,15 @@ body {
 
 .custom-strip { display: flex; gap: 6px; flex-wrap: wrap; margin: 6px 0; }
 .custom-chip { position: relative; display: inline-block; }
+.chip-pick { display: block; padding: 0; border: none; background: none; cursor: pointer; }
 .custom-chip img {
   width: 42px; height: 42px; object-fit: cover; border-radius: 10px;
-  border: 2px solid var(--line); display: block;
+  border: 2px solid var(--accent); display: block;
 }
-.custom-chip button {
+/* switched off: still yours, just not in this maze */
+.custom-chip.off img { border-color: var(--line); opacity: 0.5; filter: grayscale(0.9); }
+.chip-pick:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 12px; }
+.chip-remove {
   position: absolute; top: -6px; inset-inline-end: -6px;
   width: 18px; height: 18px; line-height: 1; padding: 0;
   border-radius: 50%; border: none; background: var(--ink); color: #fff;
@@ -162,6 +166,13 @@ body {
 .book-head .count { color: var(--muted); font-size: 0.85rem; font-weight: 400; margin-left: 6px; }
 .book-actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
 .book-actions .text-input { width: 220px; }
+
+.cover-row {
+  display: flex; gap: 16px; align-items: center; flex-wrap: wrap;
+  width: 100%; margin-top: 10px;
+}
+.cover-line { gap: 8px; }
+.cover-line .text-input { width: 260px; }
 
 .shelf { display: flex; gap: 12px; overflow-x: auto; padding: 12px 2px 4px; }
 .thumb {

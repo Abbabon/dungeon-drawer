@@ -18,6 +18,11 @@ const PICTURE_DISC = 0.77;
 /** Images for treasure pictures, keyed by their src. */
 export type ImageMap = Map<string, CanvasImageSource>;
 
+/** Reading direction for the page furniture. The preview canvas inherits it
+ *  from <html dir>, but every PDF page is drawn on a detached canvas that never
+ *  can — pass it explicitly or Hebrew pages print left-to-right. */
+export type Direction = 'ltr' | 'rtl';
+
 export interface PageInfo {
   title: string;
   /** localized difficulty label shown next to the stars */
@@ -25,6 +30,7 @@ export interface PageInfo {
   showSolution?: boolean;
   pageNumber?: number;
   images?: ImageMap;
+  dir?: Direction;
 }
 
 /** Render a full A4 page (maze + header) onto the canvas at the given pixel width. */
@@ -40,24 +46,26 @@ export function renderMazePage(
   canvas.height = H;
   const ctx = canvas.getContext('2d')!;
   const mm = W / PAGE_W_MM; // pixels per millimetre
+  const rtl = info.dir === 'rtl';
+  ctx.direction = info.dir ?? 'ltr';
 
   ctx.fillStyle = '#ffffff';
   ctx.fillRect(0, 0, W, H);
 
-  // header
+  // header — title on the side the language starts from, stars on the other
   const margin = 14 * mm;
   ctx.fillStyle = '#33333d';
   ctx.textBaseline = 'alphabetic';
-  ctx.textAlign = 'left';
+  ctx.textAlign = rtl ? 'right' : 'left';
   ctx.font = `600 ${7 * mm}px ${FONT}`;
-  ctx.fillText(info.title, margin, margin + 6 * mm);
+  ctx.fillText(info.title, rtl ? W - margin : margin, margin + 6 * mm);
   const level = DIFFICULTIES.findIndex((d) => d.id === maze.options.difficulty) + 1;
-  ctx.textAlign = 'right';
+  ctx.textAlign = rtl ? 'left' : 'right';
   ctx.font = `${4.5 * mm}px ${FONT}`;
   ctx.fillStyle = '#8a8a94';
   const stars = `${'★'.repeat(level)}${'☆'.repeat(DIFFICULTIES.length - level)}`;
   const label = info.difficultyLabel ? `${info.difficultyLabel}  ${stars}` : stars;
-  ctx.fillText(label, W - margin, margin + 6 * mm);
+  ctx.fillText(label, rtl ? margin : W - margin, margin + 6 * mm);
 
   if (info.pageNumber) {
     ctx.textAlign = 'center';
@@ -230,14 +238,21 @@ function drawArrow(
   ctx.fill();
 }
 
+export interface CoverInfo {
+  title: string;
+  /** the line under the title — a count of the mazes, or whatever the user typed */
+  subtitle: string;
+  /** a taste of what is inside; at most five are shown */
+  treasures: Treasure[];
+  images?: ImageMap;
+  dir?: Direction;
+}
+
 /** Cover page for a maze book. */
 export function renderCoverPage(
   canvas: HTMLCanvasElement,
   pixelWidth: number,
-  title: string,
-  subtitle: string,
-  treasures: Treasure[],
-  images?: ImageMap,
+  info: CoverInfo,
 ): void {
   const W = pixelWidth;
   const H = Math.round((W * PAGE_H_MM) / PAGE_W_MM);
@@ -245,6 +260,8 @@ export function renderCoverPage(
   canvas.height = H;
   const ctx = canvas.getContext('2d')!;
   const mm = W / PAGE_W_MM;
+  const rtl = info.dir === 'rtl';
+  ctx.direction = info.dir ?? 'ltr';
 
   ctx.fillStyle = '#ffffff';
   ctx.fillRect(0, 0, W, H);
@@ -261,19 +278,21 @@ export function renderCoverPage(
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.font = `600 ${14 * mm}px ${FONT}`;
-  wrapText(ctx, title, W / 2, H * 0.38, W - 60 * mm, 18 * mm);
+  wrapText(ctx, info.title, W / 2, H * 0.38, W - 60 * mm, 18 * mm);
   ctx.font = `${6 * mm}px ${FONT}`;
   ctx.fillStyle = '#8a8a94';
-  ctx.fillText(subtitle, W / 2, H * 0.5);
+  if (info.subtitle) ctx.fillText(info.subtitle, W / 2, H * 0.5);
 
-  const shown = treasures.slice(0, 5);
+  // the strip reads in the same direction as the words above it
+  const shown = info.treasures.slice(0, 5);
+  if (rtl) shown.reverse();
   const size = 16 * mm;
   const gap = 8 * mm;
   const total = shown.length * size + (shown.length - 1) * gap;
   let x = W / 2 - total / 2 + size / 2;
   for (const t of shown) {
     // icons are sized off their cell, so ask for a cell that draws them ~`size` big
-    drawTreasure(ctx, t, x, H * 0.64, size / 0.86, images);
+    drawTreasure(ctx, t, x, H * 0.64, size / 0.86, info.images);
     x += size + gap;
   }
 }
