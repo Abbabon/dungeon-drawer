@@ -95,9 +95,15 @@ export function renderShareHead(lang: Lang, indent = '    '): string {
     .join('\n');
 }
 
+/** Reading direction for a locale — the canvas renderer needs it too, because
+ *  a detached PDF canvas can't inherit <html dir>. */
+export function dirForLang(lang: Lang): 'rtl' | 'ltr' {
+  return RTL_LANGS.has(lang) ? 'rtl' : 'ltr';
+}
+
 /** `<html>` attributes for a locale — RTL flips here too. */
 export function htmlAttrs(lang: Lang): { lang: Lang; dir: 'rtl' | 'ltr' } {
-  return { lang, dir: RTL_LANGS.has(lang) ? 'rtl' : 'ltr' };
+  return { lang, dir: dirForLang(lang) };
 }
 
 /**

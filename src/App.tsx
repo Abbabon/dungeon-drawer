@@ -6,8 +6,8 @@ import { renderMazePage } from './render/draw';
 import { fileToTreasureDataUrl, loadTreasureImages, mazeTreasures } from './render/images';
 import { downloadBookPdf, downloadMazePdf, type PdfProgress } from './pdf';
 import { detectLang, LANGS, STRINGS, type Lang } from './i18n';
-import { applyShareHead, langFromLocation, pathForLang } from './share';
-import { loadState, readLangCookie, saveState, writeLangCookie } from './persist';
+import { applyShareHead, dirForLang, langFromLocation, pathForLang } from './share';
+import { loadState, readLangCookie, saveState, writeLangCookie, type StoredImage } from './persist';
 import { analytics } from './analytics';
 
 interface TreasureTheme {
@@ -42,7 +42,7 @@ let nextId = 1;
 /** Which theme button a stored page's treasures came from, or null if we can't
  *  tell — no treasures, an emoji that has since left the palette, or pictures
  *  when the user has deleted the strip the "My pictures" button hangs off. */
-function themeIdOf(treasures: Treasure[], customImages: string[]): string | null {
+function themeIdOf(treasures: Treasure[], customImages: StoredImage[]): string | null {
   const first = treasures[0];
   if (!first) return null;
   if (first.kind === 'image') return customImages.length ? 'custom' : null;
@@ -63,7 +63,7 @@ export default function App() {
   const [exits, setExits] = useState(1);
   // if their own pictures came back from last time, that's where they left off
   const [themeId, setThemeId] = useState(STORED?.images.length ? 'custom' : 'treasure');
-  const [customImages, setCustomImages] = useState<string[]>(() => STORED?.images ?? []);
+  const [customImages, setCustomImages] = useState<StoredImage[]>(() => STORED?.images ?? []);
   const [treasureCount, setTreasureCount] = useState(3);
   const [treasureSize, setTreasureSize] = useState(1);
   const [seed, setSeed] = useState(() => Math.floor(Math.random() * 1e9));
@@ -78,6 +78,9 @@ export default function App() {
     () => STORED?.book.title || STRINGS[INITIAL_LANG].defaultBookTitle,
   );
   const [bookSolutions, setBookSolutions] = useState(STORED?.book.solutions ?? true);
+  const [bookCover, setBookCover] = useState(STORED?.book.cover ?? true);
+  /** the line under the title on the cover; empty means "count the mazes for me" */
+  const [coverText, setCoverText] = useState(STORED?.book.coverText ?? '');
   const [bookTooBig, setBookTooBig] = useState(false);
   /** the book page the editor is currently standing in for, if any */
   const [selectedId, setSelectedId] = useState<number | null>(null);
@@ -109,6 +112,8 @@ export default function App() {
       book: {
         title: bookTitle,
         solutions: bookSolutions,
+        cover: bookCover,
+        coverText,
         entries: book.map(({ title: entryTitle, options: entryOptions }) => ({
           title: entryTitle,
           options: entryOptions,
@@ -117,7 +122,7 @@ export default function App() {
       images: customImages,
     });
     setBookTooBig(!stored && (book.length > 0 || customImages.length > 0));
-  }, [book, bookTitle, bookSolutions, customImages]);
+  }, [book, bookTitle, bookSolutions, bookCover, coverText, customImages]);
 
   const switchLang = (next: Lang) => {
     // keep default titles in sync unless the user typed their own
@@ -129,9 +134,11 @@ export default function App() {
   };
 
   const treasures: Treasure[] = useMemo(() => {
+    // only the pictures that are switched on; too few for the treasures asked
+    // for and they simply take turns
     const pool: Treasure[] =
       themeId === 'custom'
-        ? customImages.map((src) => ({ kind: 'image', src }))
+        ? customImages.filter((img) => img.on).map(({ src }) => ({ kind: 'image', src }))
         : THEMES.find((th) => th.id === themeId)!.emojis.map((value) => ({ kind: 'emoji', value }));
     if (!pool.length) return [];
     return Array.from({ length: treasureCount }, (_, i) => pool[i % pool.length]);
@@ -157,12 +164,13 @@ export default function App() {
         difficultyLabel: t.difficulty[maze.options.difficulty],
         showSolution,
         images,
+        dir: dirForLang(lang),
       });
     })();
     return () => {
       cancelled = true;
     };
-  }, [maze, title, showSolution, t]);
+  }, [maze, title, showSolution, t, lang]);
 
   const shuffle = () => setSeed(Math.floor(Math.random() * 1e9));
 
@@ -249,7 +257,7 @@ export default function App() {
     const good = urls.filter((u): u is string => !!u);
     if (good.length) {
       analytics.picturesUploaded(good.length);
-      setCustomImages((imgs) => [...imgs, ...good]);
+      setCustomImages((imgs) => [...imgs, ...good.map((src) => ({ src, on: true }))]);
       setThemeId('custom');
       setTreasureCount((n) => Math.max(n, 1));
     }
@@ -257,6 +265,13 @@ export default function App() {
 
   const removeCustomImage = (idx: number) =>
     setCustomImages((imgs) => imgs.filter((_, i) => i !== idx));
+
+  /** Leave a picture out of the maze without throwing it away. */
+  const toggleCustomImage = (idx: number) =>
+    setCustomImages((imgs) => imgs.map((img, i) => (i === idx ? { ...img, on: !img.on } : img)));
+
+  /** the button that opens the picture theme wears the first picture in play */
+  const pictureIcon = customImages.find((img) => img.on)?.src ?? customImages[0]?.src;
 
   return (
     <div className="app">
@@ -347,7 +362,7 @@ export default function App() {
                   className={`theme ${themeId === 'custom' ? 'active' : ''}`}
                   onClick={() => setThemeId('custom')}
                 >
-                  <img className="theme-img" src={customImages[0]} alt={t.myPictures} />
+                  <img className="theme-img" src={pictureIcon} alt={t.myPictures} />
                 </button>
               )}
             </div>
@@ -366,21 +381,34 @@ export default function App() {
             </label>
             {themeId === 'custom' && customImages.length > 0 && (
               <div className="custom-strip">
-                {customImages.map((src, i) => (
-                  <span key={i} className="custom-chip">
-                    <img src={src} alt="" />
-                    <button title={t.remove} onClick={() => removeCustomImage(i)}>✕</button>
+                {customImages.map((img, i) => (
+                  <span key={i} className={`custom-chip ${img.on ? '' : 'off'}`}>
+                    <button
+                      className="chip-pick"
+                      title={t.usePicture}
+                      aria-pressed={img.on}
+                      onClick={() => toggleCustomImage(i)}
+                    >
+                      <img src={img.src} alt="" />
+                    </button>
+                    <button
+                      className="chip-remove"
+                      title={t.remove}
+                      onClick={() => removeCustomImage(i)}
+                    >
+                      ✕
+                    </button>
                   </span>
                 ))}
               </div>
             )}
-            <p className="hint">{t.uploadHint}</p>
+            <p className="hint">{themeId === 'custom' && customImages.length > 0 ? t.pictureToggleHint : t.uploadHint}</p>
             <label className="row">
               {t.howMany} <strong>{treasureCount}</strong>
               <input
                 type="range"
                 min={0}
-                max={5}
+                max={10}
                 value={treasureCount}
                 onChange={(e) => setTreasureCount(Number(e.target.value))}
               />
@@ -431,7 +459,7 @@ export default function App() {
               onClick={() => {
                 analytics.pdfDownloaded(options, withSolutionPage);
                 void buildPdf('page', (onProgress) =>
-                  downloadMazePdf(maze, title, withSolutionPage, t, onProgress),
+                  downloadMazePdf(maze, title, withSolutionPage, lang, onProgress),
                 );
               }}
             >
@@ -498,7 +526,8 @@ export default function App() {
                     bookTitle,
                     book.map((e) => ({ maze: generateMaze(e.options), title: e.title })),
                     bookSolutions,
-                    t,
+                    { include: bookCover, text: coverText },
+                    lang,
                     onProgress,
                   ),
                 );
@@ -512,6 +541,29 @@ export default function App() {
             </button>
           </div>
         </div>
+        <div className="cover-row">
+          <label className="toggle small">
+            <input
+              type="checkbox"
+              checked={bookCover}
+              onChange={(e) => setBookCover(e.target.checked)}
+            />
+            {t.includeCoverPage}
+          </label>
+          {bookCover && (
+            <label className="toggle small cover-line">
+              {t.coverText}
+              <input
+                className="text-input"
+                value={coverText}
+                maxLength={60}
+                placeholder={t.mazesInside(book.length)}
+                onChange={(e) => setCoverText(e.target.value)}
+              />
+            </label>
+          )}
+        </div>
+        {bookCover && <p className="hint">{t.coverTextHint}</p>}
         {bookTooBig && <p className="hint warn">{t.bookNotSaved}</p>}
         {book.length === 0 ? (
           <p className="hint">{t.bookHint}</p>
@@ -523,6 +575,7 @@ export default function App() {
                 entry={entry}
                 index={i}
                 difficultyLabel={t.difficulty[entry.options.difficulty]}
+                dir={dirForLang(lang)}
                 removeLabel={t.remove}
                 openLabel={t.openPage}
                 selected={entry.id === selectedId}
@@ -543,6 +596,7 @@ function BookThumb({
   entry,
   index,
   difficultyLabel,
+  dir,
   removeLabel,
   openLabel,
   selected,
@@ -552,6 +606,7 @@ function BookThumb({
   entry: BookEntryState;
   index: number;
   difficultyLabel: string;
+  dir: 'ltr' | 'rtl';
   removeLabel: string;
   openLabel: string;
   selected: boolean;
@@ -565,12 +620,12 @@ function BookThumb({
     (async () => {
       const images = await loadTreasureImages(mazeTreasures([maze]));
       if (cancelled || !ref.current) return;
-      renderMazePage(ref.current, maze, 300, { title: entry.title, difficultyLabel, images });
+      renderMazePage(ref.current, maze, 300, { title: entry.title, difficultyLabel, images, dir });
     })();
     return () => {
       cancelled = true;
     };
-  }, [maze, entry.title, difficultyLabel]);
+  }, [maze, entry.title, difficultyLabel, dir]);
   return (
     <div className={`thumb ${selected ? 'selected' : ''}`}>
       <button

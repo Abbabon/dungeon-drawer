@@ -50,18 +50,37 @@ export interface StoredBookEntry {
 export interface StoredBook {
   title: string;
   solutions: boolean;
+  /** false skips the cover page entirely */
+  cover: boolean;
+  /** the line under the book title; empty means "count the mazes for me" */
+  coverText: string;
   entries: StoredBookEntry[];
+}
+
+/** An uploaded picture and whether it is currently in play. */
+export interface StoredImage {
+  src: string;
+  on: boolean;
 }
 
 export interface StoredState {
   book: StoredBook;
   /** the user's own uploaded treasure pictures, so the strip survives a reload */
-  images: string[];
+  images: StoredImage[];
 }
 
 /** Uploads only ever become data URLs; refuse anything else that shows up. */
 function isDataImage(value: unknown): value is string {
   return typeof value === 'string' && value.startsWith('data:image/');
+}
+
+/** Pictures used to be stored as bare data URLs, before they could be switched
+ *  off — an old snapshot reads back as "all of them are in play". */
+function parseImage(value: unknown): StoredImage | null {
+  if (isDataImage(value)) return { src: value, on: true };
+  if (!value || typeof value !== 'object') return null;
+  const img = value as Record<string, unknown>;
+  return isDataImage(img.src) ? { src: img.src, on: img.on !== false } : null;
 }
 
 /** localStorage is user-editable and survives across app versions — validate. */
@@ -119,9 +138,13 @@ export function loadState(): StoredState | null {
       book: {
         title: typeof book.title === 'string' ? book.title : '',
         solutions: book.solutions !== false,
+        cover: book.cover !== false,
+        coverText: typeof book.coverText === 'string' ? book.coverText : '',
         entries: parsed,
       },
-      images: Array.isArray(data.images) ? data.images.filter(isDataImage) : [],
+      images: Array.isArray(data.images)
+        ? data.images.map(parseImage).filter((i): i is StoredImage => i !== null)
+        : [],
     };
   } catch {
     clearState();

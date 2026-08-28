@@ -219,13 +219,20 @@ export function generateMaze(options: MazeOptions): Maze {
   // --- waypoint treasures spread along the solution path ---
   const waypoints: Waypoint[] = [];
   const treasures = options.treasures;
-  if (treasures.length > 0 && solution.length > treasures.length + 4) {
+  if (treasures.length > 0 && solution.length > 6) {
     const lo = Math.floor(solution.length * 0.15);
     const hi = Math.ceil(solution.length * 0.85);
     const span = hi - lo;
+    // Evenly spread, but never two treasures on one cell: a short path with a
+    // lot of treasures packs them a cell apart and drops whatever runs off the
+    // end. (With a handful of treasures the nudge never fires, so old seeds
+    // still reproduce exactly.)
+    let prev = -1;
     for (let i = 0; i < treasures.length; i++) {
       const t = treasures.length === 1 ? 0.5 : i / (treasures.length - 1);
-      const idx = Math.min(hi - 1, lo + Math.floor(t * (span - 1)));
+      const idx = Math.max(prev + 1, Math.min(hi - 1, lo + Math.floor(t * (span - 1))));
+      if (idx >= hi) break;
+      prev = idx;
       const [r, c] = solution[idx];
       waypoints.push({ r, c, r0: r, c0: c, size: 1, treasure: treasures[i] });
     }
@@ -282,7 +289,11 @@ export function generateMaze(options: MazeOptions): Maze {
   const requestedSize = Math.max(1, Math.min(5, Math.round(options.treasureSize ?? 1)));
   if (requestedSize > 1) {
     const doorCells = new Set(openings.map((o) => key(o.r, o.c)));
-    const claimed = new Set<number>();
+    // Every anchor is spoken for from the outset: a room that swallowed a
+    // neighbouring treasure's cell would sit two icons in one chamber, and the
+    // one that fell back to a single cell has nowhere else to go.
+    const claimed = new Map<number, Waypoint>();
+    for (const w of waypoints) claimed.set(key(w.r, w.c), w);
     for (const w of waypoints) {
       outer: for (let size = requestedSize; size >= 2; size--) {
         // candidate top-left corners, closest-to-centered first (deterministic)
@@ -298,7 +309,7 @@ export function generateMaze(options: MazeOptions): Maze {
           let fits = true;
           for (let r = r0; r < r0 + size && fits; r++)
             for (let c = c0; c < c0 + size && fits; c++)
-              if (!inMask(r, c) || doorCells.has(key(r, c)) || claimed.has(key(r, c)))
+              if (!inMask(r, c) || doorCells.has(key(r, c)) || (claimed.get(key(r, c)) ?? w) !== w)
                 fits = false;
           if (!fits) continue;
           const undo: [number, number, Side][] = [];
@@ -319,7 +330,7 @@ export function generateMaze(options: MazeOptions): Maze {
           w.size = size;
           if (layoutIsSafe()) {
             for (let r = r0; r < r0 + size; r++)
-              for (let c = c0; c < c0 + size; c++) claimed.add(key(r, c));
+              for (let c = c0; c < c0 + size; c++) claimed.set(key(r, c), w);
             break outer;
           }
           for (const [r, c, s] of undo) {

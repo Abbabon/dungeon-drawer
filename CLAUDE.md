@@ -10,16 +10,22 @@ npm run build    # tsc --noEmit (strict typecheck) + vite build → dist/
 npm run preview  # serve the production build locally
 ```
 
-No test script and no lint config. `npm run build` is the correctness gate; `scripts/` is type-checked by it too. Regenerating the share cards is a separate manual step — see **Share cards** below.
+No test script and no lint config. `npm run build` is the correctness gate; `scripts/` is type-checked by it too. TypeScript is strict with `noUnusedLocals`/`noUnusedParameters`, so unused code fails the build.
 
-There is no test script or lint config. `npm run build` is the correctness gate — TypeScript is strict with `noUnusedLocals`/`noUnusedParameters`, so unused code fails the build. For ad-hoc verification scripts (e.g. regenerating the maze invariant suite), run them with `npx tsx <script>`; `tsx` is a devDependency for exactly this.
+The one real test is the generator invariant suite, run by hand after touching `src/maze/generate.ts`:
+
+```bash
+npx tsx scripts/verify-mazes.ts   # 625 mazes; prints "all invariants hold"
+```
+
+Regenerating the share cards is a separate manual step — see **Share cards** below.
 
 ## Feature pipeline
 
 `main` is production (Vercel deploys it on push). For any user-facing change:
 
 1. Branch: `git checkout -b feature/<name>`.
-2. Implement; `npm run build` must pass, regenerate the invariant suite if generation logic changed, and regenerate the share cards if `LANGS`/`appTitle`/`tagline` changed.
+2. Implement; `npm run build` must pass, run `npx tsx scripts/verify-mazes.ts` if generation logic changed, and regenerate the share cards if `LANGS`/`appTitle`/`tagline` changed.
 3. Commit (as Abbabon) and push the branch; the user tests it (`npm run dev` locally or the Vercel preview deploy) before it merges.
 4. Merge to `main` only after the user approves. Trivial fixes (copy, typos) may go straight to `main` when the user says so.
 
@@ -42,13 +48,19 @@ Two cross-cutting modules sit beside that pipeline: `share.ts` (locale ↔ URL m
 2. every decoy door stays disconnected from start;
 3. every treasure remains a cut vertex (no route can bypass it).
 
-Any change to the pipeline must preserve these. The historical invariant suite generated 5 shapes × 5 difficulties × 25 seeds (625 mazes) and asserted all three plus solvability — recreate something equivalent when touching generation logic.
+Any change to the pipeline must preserve these. `scripts/verify-mazes.ts` sweeps 5 shapes × 5 difficulties × 25 seeds (625 mazes, treasure counts 0–10 and sizes 1–5) and asserts all three plus solvability and one more: **treasure rooms never overlap**. Rooms are carved largest-first and a treasure that finds no room falls back to its single anchor cell, so every anchor is claimed up front — otherwise a big room swallows a neighbouring treasure and two icons print on top of each other.
 
-**Rendering** (`src/render/draw.ts`): the same renderer draws the 900 px preview, 300 px book thumbnails, and 2480 px (~300 dpi A4) PDF pages, so preview = print. Draw order is part of correctness: solution line → treasures → walls on top. Treasure icons must fit inside one cell and never cover a wall.
+Treasures are spread along the solution path at evenly spaced indices, nudged apart when the path is too short for the count (up to 10), and any that no longer fit are dropped rather than stacked.
+
+**Rendering** (`src/render/draw.ts`): the same renderer draws the 900 px preview, 300 px book thumbnails, and 2480 px (~300 dpi A4) PDF pages, so preview = print. Every entry point takes an explicit `dir` — the preview canvas is in the document and inherits `<html dir>`, but a PDF page is drawn on a *detached* canvas that cannot, so without it Hebrew pages printed left-to-right (numbers at the wrong end of the line, title on the wrong side) while the preview looked fine. `dirForLang` in `share.ts` is the single source. Draw order is part of correctness: solution line → treasures → walls on top. Treasure icons must fit inside one cell and never cover a wall.
 
 **PDF assembly** (`src/pdf.ts`): every page is a canvas PNG handed to `jsPDF.addImage` with an explicit `'SLOW'` compression argument. jsPDF stores image data *uncompressed* when that argument is omitted — 26 MB of raw pixels per A4 page, which once produced a 250 MB seven-maze book. Deflate is lossless, so the print is unaffected; never drop the argument.
 
 Both export functions take an optional `onProgress(done, total)` and yield a frame (`nextFrame()`) before each page — page rendering blocks the main thread, so without the yield the counter would never paint. `App.tsx` drives the busy label from it and locks re-entry with a **ref**, not the `building` state: `disabled` only reaches the DOM on the next render, so a state-only guard still lets two same-tick clicks start two renders of the same document.
+
+**The cover is the user's.** `downloadBookPdf` takes a `CoverChoice`: drop the cover page entirely, or type your own line under the title — blank falls back to the localized `t.mazesInside(n)`. Both live in the stored book, next to the title.
+
+**Uploaded pictures switch on and off.** Each one is stored as `{src, on}`, and only the ones that are on go into the treasure pool; a pool shorter than the treasure count simply repeats (`pool[i % pool.length]`), so one picture can fill all ten treasures. Old snapshots hold bare data URLs and read back as "all on".
 
 **Book pages are editable.** Adding to the book does not reroll the editor, and clicking a shelf thumbnail loads that page's `{options, seed}` back into the controls (`selectPage` in `App.tsx`). Edits only reach the stored page when the user presses save — so the shelf never changes under them. Loading maps `options.treasures` back to a theme button via `themeIdOf`; a page whose treasures are no longer in the palette keeps the current theme rather than guessing.
 
@@ -71,7 +83,7 @@ The page renders all locales and POSTs each PNG to the writer; the RTL layout is
 **Persistence** (`src/persist.ts`). Two stores, chosen on purpose:
 
 - **Language** — a `dd_lang` cookie, one year, `SameSite=Lax`. Small, and readable outside JS if an edge redirect ever fronts the locale pages.
-- **Book + uploaded pictures** — `localStorage` under `dd_state_v1`, shaped `{ book: { title, solutions, entries }, images }`. Deliberately *not* a cookie: photos ride along as data URLs and blow past the ~4 KB limit, and a book has no business being sent up with every request.
+- **Book + uploaded pictures** — `localStorage` under `dd_state_v1`, shaped `{ book: { title, solutions, cover, coverText, entries }, images: [{ src, on }] }`. Deliberately *not* a cookie: photos ride along as data URLs and blow past the ~4 KB limit, and a book has no business being sent up with every request.
 
 Entries stay `{options, seed}` snapshots, so a restored book re-generates byte-identical mazes — this is the same determinism contract as above, now load-bearing across sessions too. Everything read back is validated (`parseOptions`, `isDataImage`) because localStorage is user-editable; a bad payload is dropped, never fed to `generateMaze`. `saveState` returns `false` when the browser refuses (quota, private mode) and the UI surfaces `Strings.bookNotSaved` rather than silently forgetting.
 

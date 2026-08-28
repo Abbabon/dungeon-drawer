@@ -1,6 +1,7 @@
 import { jsPDF } from 'jspdf';
 import type { Maze } from './maze/types';
-import type { Strings } from './i18n';
+import { STRINGS, type Lang } from './i18n';
+import { dirForLang } from './share';
 import { PAGE_W_MM, PAGE_H_MM, renderMazePage, renderCoverPage } from './render/draw';
 import { loadTreasureImages, mazeTreasures } from './render/images';
 
@@ -72,17 +73,26 @@ export interface BookEntry {
   title: string;
 }
 
+/** What the front page should say, straight from the book controls. */
+export interface CoverChoice {
+  include: boolean;
+  /** the user's own line; blank means "count the mazes for me" */
+  text: string;
+}
+
 export async function downloadMazePdf(
   maze: Maze,
   title: string,
   includeSolution: boolean,
-  t: Strings,
+  lang: Lang,
   onProgress?: PdfProgress,
 ): Promise<void> {
+  const t = STRINGS[lang];
+  const dir = dirForLang(lang);
   const images = await loadTreasureImages(mazeTreasures([maze]));
   const difficultyLabel = t.difficulty[maze.options.difficulty];
   const pages: DrawPage[] = [
-    (c) => renderMazePage(c, maze, PDF_PIXEL_WIDTH, { title, difficultyLabel, images }),
+    (c) => renderMazePage(c, maze, PDF_PIXEL_WIDTH, { title, difficultyLabel, images, dir }),
   ];
   if (includeSolution) {
     pages.push((c) =>
@@ -91,6 +101,7 @@ export async function downloadMazePdf(
         difficultyLabel,
         showSolution: true,
         images,
+        dir,
       }),
     );
   }
@@ -103,24 +114,35 @@ export async function downloadBookPdf(
   bookTitle: string,
   entries: BookEntry[],
   includeSolutions: boolean,
-  t: Strings,
+  cover: CoverChoice,
+  lang: Lang,
   onProgress?: PdfProgress,
 ): Promise<void> {
+  const t = STRINGS[lang];
+  const dir = dirForLang(lang);
   const images = await loadTreasureImages(mazeTreasures(entries.map((e) => e.maze)));
-  const treasures = mazeTreasures(entries.map((e) => e.maze));
-  const seen = new Set<string>();
-  const unique = treasures.filter((tr) => {
-    const k = tr.kind === 'emoji' ? tr.value : tr.src;
-    if (seen.has(k)) return false;
-    seen.add(k);
-    return true;
-  });
-  if (!unique.length) unique.push({ kind: 'emoji', value: '🏰' }, { kind: 'emoji', value: '⭐' });
 
-  const pages: DrawPage[] = [
-    (c) =>
-      renderCoverPage(c, PDF_PIXEL_WIDTH, bookTitle, t.mazesInside(entries.length), unique, images),
-  ];
+  const pages: DrawPage[] = [];
+  if (cover.include) {
+    const treasures = mazeTreasures(entries.map((e) => e.maze));
+    const seen = new Set<string>();
+    const unique = treasures.filter((tr) => {
+      const k = tr.kind === 'emoji' ? tr.value : tr.src;
+      if (seen.has(k)) return false;
+      seen.add(k);
+      return true;
+    });
+    if (!unique.length) unique.push({ kind: 'emoji', value: '🏰' }, { kind: 'emoji', value: '⭐' });
+    pages.push((c) =>
+      renderCoverPage(c, PDF_PIXEL_WIDTH, {
+        title: bookTitle,
+        subtitle: cover.text.trim() || t.mazesInside(entries.length),
+        treasures: unique,
+        images,
+        dir,
+      }),
+    );
+  }
   entries.forEach((entry, i) => {
     pages.push((c) =>
       renderMazePage(c, entry.maze, PDF_PIXEL_WIDTH, {
@@ -128,6 +150,7 @@ export async function downloadBookPdf(
         difficultyLabel: t.difficulty[entry.maze.options.difficulty],
         pageNumber: i + 1,
         images,
+        dir,
       }),
     );
   });
@@ -140,6 +163,7 @@ export async function downloadBookPdf(
           showSolution: true,
           pageNumber: entries.length + i + 1,
           images,
+          dir,
         }),
       );
     });
