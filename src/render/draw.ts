@@ -31,6 +31,10 @@ export interface PageInfo {
   pageNumber?: number;
   images?: ImageMap;
   dir?: Direction;
+  /** Sheet colour. Screen-only: the preview dims it in night mode so a full
+   *  A4 of white does not glare. Every PDF path leaves it undefined, which is
+   *  the point — print output must not follow the app's theme. */
+  paper?: string;
 }
 
 /** Render a full A4 page (maze + header) onto the canvas at the given pixel width. */
@@ -49,7 +53,7 @@ export function renderMazePage(
   const rtl = info.dir === 'rtl';
   ctx.direction = info.dir ?? 'ltr';
 
-  ctx.fillStyle = '#ffffff';
+  ctx.fillStyle = info.paper ?? '#ffffff';
   ctx.fillRect(0, 0, W, H);
 
   // header — title on the side the language starts from, stars on the other
