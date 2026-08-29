@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { generateMaze } from './maze/generate';
-import type { DifficultyId, MazeOptions, ShapeId, Treasure } from './maze/types';
+import type { DifficultyId, Maze, MazeOptions, ShapeId, Treasure } from './maze/types';
 import { DIFFICULTIES } from './maze/types';
 import { renderMazePage } from './render/draw';
 import { fileToTreasureDataUrl, loadTreasureImages, mazeTreasures } from './render/images';
@@ -48,6 +48,13 @@ interface BookEntryState {
 }
 
 let nextId = 1;
+
+/** How long a fresh maze takes to draw itself on, in ms. */
+const INK_MS = 620;
+
+function prefersReducedMotion(): boolean {
+  return !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+}
 
 /** Which theme button a stored page's treasures came from, or null if we can't
  *  tell — no treasures, an emoji that has since left the palette, or pictures
@@ -176,22 +183,53 @@ export default function App() {
   const selectedIndex = book.findIndex((e) => e.id === selectedId);
 
   const previewRef = useRef<HTMLCanvasElement>(null);
+  /** The maze the preview last inked on, so retitling does not redraw it. */
+  const inkedRef = useRef<Maze | null>(null);
+  const rafRef = useRef<number | null>(null);
+
   useEffect(() => {
     let cancelled = false;
     (async () => {
       const images = await loadTreasureImages(mazeTreasures([maze]));
       if (cancelled || !previewRef.current) return;
-      renderMazePage(previewRef.current, maze, 900, {
-        title,
-        difficultyLabel: t.difficulty[maze.options.difficulty],
-        showSolution,
-        images,
-        dir: dirForLang(lang),
-        paper: theme === 'dark' && dimPaper ? '#e7e2d6' : undefined,
-      });
+      const canvas = previewRef.current;
+      const paint = (ink: number) =>
+        renderMazePage(canvas, maze, 900, {
+          title,
+          difficultyLabel: t.difficulty[maze.options.difficulty],
+          showSolution,
+          images,
+          dir: dirForLang(lang),
+          paper: theme === 'dark' && dimPaper ? '#e7e2d6' : undefined,
+          ink,
+        });
+
+      // A new maze draws itself on; everything else here (a retitle, the
+      // theme, peeking at the solution) is a repaint of the same maze and
+      // must not restart the animation.
+      const isNewMaze = inkedRef.current !== maze;
+      inkedRef.current = maze;
+      if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
+      rafRef.current = null;
+
+      if (!isNewMaze || prefersReducedMotion()) {
+        paint(1);
+        return;
+      }
+
+      const started = performance.now();
+      const step = (now: number) => {
+        const p = Math.min(1, (now - started) / INK_MS);
+        // ease-out: the pen moves fastest at the start, like a real stroke
+        paint(p < 1 ? 1 - (1 - p) ** 3 : 1);
+        rafRef.current = p < 1 && !cancelled ? requestAnimationFrame(step) : null;
+      };
+      rafRef.current = requestAnimationFrame(step);
     })();
     return () => {
       cancelled = true;
+      if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
+      rafRef.current = null;
     };
   }, [maze, title, showSolution, t, lang, theme, dimPaper]);
 

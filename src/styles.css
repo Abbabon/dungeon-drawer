@@ -459,13 +459,6 @@ body {
   max-height: calc(100vh - 230px);
 }
 
-/* Rerolling used to be a hard repaint with no acknowledgement. */
-@keyframes sheet-in {
-  from { opacity: 0; transform: translateY(9px); }
-  to { opacity: 1; transform: none; }
-}
-.preview-canvas { animation: sheet-in 260ms var(--ease); }
-
 /* ------------------------------------------------------------------ book */
 
 .book-shelf { margin-top: 8px; }
@@ -543,6 +536,5 @@ body {
   .pill:hover, .shape:hover, .theme:hover, .upload-btn:hover, .big-btn:hover,
   .thumb:hover, .chip-pick:hover img, .chip-remove:hover, .thumb-bar button:hover,
   .lang-select:hover, .theme-toggle:hover, .paper:hover { transform: none; }
-  .preview-canvas { animation: none; }
   .spinner { animation-duration: 2.4s; }
 }

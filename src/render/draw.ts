@@ -35,6 +35,10 @@ export interface PageInfo {
    *  A4 of white does not glare. Every PDF path leaves it undefined, which is
    *  the point — print output must not follow the app's theme. */
   paper?: string;
+  /** 0–1: how much of the ink has landed. Screen-only, like `paper` — the
+   *  preview draws a fresh maze on over half a second instead of snapping it
+   *  into place. Every PDF path leaves it undefined, i.e. finished. */
+  ink?: number;
 }
 
 /** Render a full A4 page (maze + header) onto the canvas at the given pixel width. */
@@ -82,7 +86,7 @@ export function renderMazePage(
   const top = margin + 14 * mm;
   const areaW = W - margin * 2;
   const areaH = H - top - 16 * mm;
-  drawMaze(ctx, maze, margin, top, areaW, areaH, !!info.showSolution, info.images);
+  drawMaze(ctx, maze, margin, top, areaW, areaH, !!info.showSolution, info.images, info.ink);
 }
 
 export function drawMaze(
@@ -94,8 +98,13 @@ export function drawMaze(
   areaH: number,
   showSolution: boolean,
   images?: ImageMap,
+  ink = 1,
 ): void {
   const { rows, cols, mask, walls, openings, waypoints, solution } = maze;
+  const drawn = Math.max(0, Math.min(1, ink));
+  // The furniture lands once the walls are mostly down, so the page assembles
+  // in the order you would draw it by hand.
+  const late = Math.max(0, Math.min(1, (drawn - 0.55) / 0.45));
   // leave a rim for arrows outside the maze border
   const rim = 1.6;
   const cell = Math.min(areaW / (cols + rim * 2), areaH / (rows + rim * 2));
@@ -111,7 +120,7 @@ export function drawMaze(
     ctx.lineWidth = Math.max(1.5, cell * 0.28);
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
-    ctx.globalAlpha = 0.75;
+    ctx.globalAlpha = 0.75 * late;
     ctx.beginPath();
     const startO = openings.find((o) => o.kind === 'start')!;
     const exitO = openings.find((o) => o.kind === 'exit')!;
@@ -129,11 +138,13 @@ export function drawMaze(
   // treasures go under the walls: icons stay inside their room block (a fully
   // open chamber — generation guarantees no internal walls), so no wall is
   // ever hidden and the maze can always be solved by what's visible
+  ctx.globalAlpha = late;
   for (const wp of waypoints) {
     const cx = px(wp.c0 + wp.size / 2);
     const cy = py(wp.r0 + wp.size / 2);
     drawTreasure(ctx, wp.treasure, cx, cy, cell * wp.size, images);
   }
+  ctx.globalAlpha = 1;
 
   // walls
   ctx.strokeStyle = WALL_COLOR;
@@ -150,9 +161,16 @@ export function drawMaze(
       if (w.E) { ctx.moveTo(px(c + 1), py(r)); ctx.lineTo(px(c + 1), py(r + 1)); }
     }
   }
+  if (drawn < 1) {
+    ctx.setLineDash([cell]);
+    ctx.lineDashOffset = cell * (1 - drawn);
+  }
   ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.lineDashOffset = 0;
 
   // arrows at the doors
+  ctx.globalAlpha = late;
   for (const o of openings) {
     const [dr, dc] = DELTA[o.side];
     const isEntrance = o.kind === 'start' || o.kind === 'decoy-entrance';
@@ -165,6 +183,7 @@ export function drawMaze(
     const tipY = midY + dr * cell * (isEntrance ? 0.7 : 1.5);
     drawArrow(ctx, baseX, baseY, tipX, tipY, Math.max(2, cell * 0.2), WALL_COLOR);
   }
+  ctx.globalAlpha = 1;
 }
 
 function drawTreasure(
