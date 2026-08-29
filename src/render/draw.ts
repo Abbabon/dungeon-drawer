@@ -39,6 +39,9 @@ export interface PageInfo {
    *  preview draws a fresh maze on over half a second instead of snapping it
    *  into place. Every PDF path leaves it undefined, i.e. finished. */
   ink?: number;
+  /** 0–1 for the solution line, which draws itself in one quick stroke when
+   *  you peek. Screen-only, like the two above. */
+  solutionInk?: number;
 }
 
 /** Render a full A4 page (maze + header) onto the canvas at the given pixel width. */
@@ -86,7 +89,7 @@ export function renderMazePage(
   const top = margin + 14 * mm;
   const areaW = W - margin * 2;
   const areaH = H - top - 16 * mm;
-  drawMaze(ctx, maze, margin, top, areaW, areaH, !!info.showSolution, info.images, info.ink);
+  drawMaze(ctx, maze, margin, top, areaW, areaH, !!info.showSolution, info.images, info.ink, info.solutionInk);
 }
 
 export function drawMaze(
@@ -99,6 +102,7 @@ export function drawMaze(
   showSolution: boolean,
   images?: ImageMap,
   ink = 1,
+  solutionInk = 1,
 ): void {
   const { rows, cols, mask, walls, openings, waypoints, solution } = maze;
   const drawn = Math.max(0, Math.min(1, ink));
@@ -115,23 +119,40 @@ export function drawMaze(
   const lw = Math.max(1.5, cell * 0.16);
 
   // solution first so walls sit on top of it
-  if (showSolution && solution.length) {
-    ctx.strokeStyle = SOLUTION_COLOR;
-    ctx.lineWidth = Math.max(1.5, cell * 0.28);
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-    ctx.globalAlpha = 0.75 * late;
-    ctx.beginPath();
+  const traced = Math.max(0, Math.min(1, solutionInk));
+  if (showSolution && solution.length && traced > 0) {
     const startO = openings.find((o) => o.kind === 'start')!;
     const exitO = openings.find((o) => o.kind === 'exit')!;
     const outside = (o: Opening, dist: number): [number, number] => {
       const [dr, dc] = DELTA[o.side];
       return [px(o.c + 0.5) + dc * cell * dist, py(o.r + 0.5) + dr * cell * dist];
     };
-    ctx.moveTo(...outside(startO, 1.1));
-    for (const [r, c] of solution) ctx.lineTo(px(c + 0.5), py(r + 0.5));
-    ctx.lineTo(...outside(exitO, 1.1));
+    const route: [number, number][] = [
+      outside(startO, 1.1),
+      ...solution.map(([r, c]) => [px(c + 0.5), py(r + 0.5)] as [number, number]),
+      outside(exitO, 1.1),
+    ];
+    // a dash as long as the whole route, walked from hidden to drawn
+    let routeLen = 0;
+    for (let i = 1; i < route.length; i++) {
+      routeLen += Math.hypot(route[i][0] - route[i - 1][0], route[i][1] - route[i - 1][1]);
+    }
+
+    ctx.strokeStyle = SOLUTION_COLOR;
+    ctx.lineWidth = Math.max(1.5, cell * 0.28);
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.globalAlpha = 0.75 * late;
+    ctx.beginPath();
+    ctx.moveTo(route[0][0], route[0][1]);
+    for (let i = 1; i < route.length; i++) ctx.lineTo(route[i][0], route[i][1]);
+    if (traced < 1) {
+      ctx.setLineDash([routeLen]);
+      ctx.lineDashOffset = routeLen * (1 - traced);
+    }
     ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.lineDashOffset = 0;
     ctx.globalAlpha = 1;
   }
 

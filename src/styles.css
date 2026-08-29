@@ -120,6 +120,21 @@
   --danger: #ef8a7f;
 }
 
+/* Day <-> night is a dissolve, not a cut: these surfaces only ever change
+   colour when the theme does, so the transition costs nothing elsewhere. */
+body,
+.controls,
+.book-shelf.card,
+.preview-actions,
+.paper,
+.thumb,
+.text-input,
+.row select,
+.editing-note {
+  transition: background-color 420ms var(--ease), border-color 420ms var(--ease),
+    color 420ms var(--ease), box-shadow 420ms var(--ease);
+}
+
 body {
   margin: 0;
   font-family: 'Avenir Next', 'Avenir', 'Segoe UI', 'Trebuchet MS', system-ui, sans-serif;
@@ -173,7 +188,12 @@ body {
   justify-content: center;
   padding: 0;
 }
+@keyframes theme-icon-in {
+  from { opacity: 0; transform: rotate(-70deg) scale(0.6); }
+  to { opacity: 1; transform: none; }
+}
 .theme-toggle svg {
+  animation: theme-icon-in 380ms var(--ease);
   width: 19px;
   height: 19px;
   fill: none;
@@ -441,6 +461,7 @@ body {
 /* The sheet: paper on a desk, lifted off it, sitting a half-degree askew
    the way a page actually lands. The tilt is cosmetic and screen-only. */
 .paper {
+  position: relative;
   align-self: center;
   background: var(--paper);
   border: 1px solid var(--paper-line);
@@ -448,9 +469,7 @@ body {
   box-shadow: var(--paper-shadow);
   overflow: hidden;
   transform: rotate(-0.35deg);
-  transition: box-shadow 220ms var(--ease), transform 220ms var(--ease);
 }
-.paper:hover { transform: rotate(0deg); }
 .preview-canvas {
   display: block;
   width: auto;
@@ -458,6 +477,83 @@ body {
   max-width: 100%;
   max-height: calc(100vh - 230px);
 }
+
+/* ------------------------------------------------------------- draw mode *
+ * A sheet of acetate over the preview, for solving it on a tablet. The maze
+ * underneath is redrawn on every knob turn, so the ink needs its own canvas. */
+
+.draw-layer {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+  cursor: crosshair;
+}
+
+.draw-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 10px 12px;
+  background: var(--accent-soft);
+  border: 1.5px solid var(--accent);
+  border-radius: 16px;
+}
+.draw-group { display: inline-flex; gap: 6px; }
+
+.swatch,
+.nib,
+.draw-btn {
+  font: inherit;
+  cursor: pointer;
+  border: 2px solid transparent;
+  border-radius: 12px;
+  transition: transform 170ms var(--ease), border-color 170ms var(--ease),
+    box-shadow 170ms var(--ease), background-color 170ms var(--ease);
+}
+.swatch:hover,
+.nib:hover,
+.draw-btn:hover { transform: translateY(-2px); }
+.swatch:active,
+.nib:active,
+.draw-btn:active { transform: translateY(1px); }
+
+.swatch {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border-color: rgba(255, 255, 255, 0.55);
+  box-shadow: 0 1px 3px rgba(60, 45, 20, 0.35);
+}
+.swatch.active { border-color: rgba(255, 255, 255, 0.9); box-shadow: 0 0 0 3px var(--accent); }
+
+.nib {
+  width: 34px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--key);
+  border-color: var(--key-line);
+}
+.nib span { display: block; border-radius: 50%; background: var(--ink); }
+.nib.active { border-color: var(--accent); background: var(--key-hover); }
+
+.draw-btn {
+  min-height: 34px;
+  padding: 6px 12px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--ink);
+  background: var(--key);
+  border-color: var(--key-line);
+}
+.draw-btn.active { border-color: var(--accent); background: var(--key-hover); color: var(--accent-ink); }
+.draw-btn:disabled { opacity: 0.4; cursor: default; transform: none; }
+
+.draw-note { font-size: 0.8rem; color: var(--accent-ink); line-height: 1.45; flex: 1 1 220px; }
 
 /* ------------------------------------------------------------------ book */
 
@@ -533,8 +629,12 @@ body {
 
 @media (prefers-reduced-motion: reduce) {
   * { transition-duration: 1ms !important; }
+  body, .controls, .book-shelf.card, .preview-actions, .paper, .thumb,
+  .text-input, .row select, .editing-note { transition-duration: 1ms; }
+  .theme-toggle svg { animation: none; }
   .pill:hover, .shape:hover, .theme:hover, .upload-btn:hover, .big-btn:hover,
   .thumb:hover, .chip-pick:hover img, .chip-remove:hover, .thumb-bar button:hover,
-  .lang-select:hover, .theme-toggle:hover, .paper:hover { transform: none; }
+  .lang-select:hover, .theme-toggle:hover,
+  .swatch:hover, .nib:hover, .draw-btn:hover { transform: none; }
   .spinner { animation-duration: 2.4s; }
 }

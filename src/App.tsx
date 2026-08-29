@@ -1,8 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { generateMaze } from './maze/generate';
-import type { DifficultyId, Maze, MazeOptions, ShapeId, Treasure } from './maze/types';
+import type { DifficultyId, MazeOptions, ShapeId, Treasure } from './maze/types';
 import { DIFFICULTIES } from './maze/types';
-import { renderMazePage } from './render/draw';
+import { PAGE_H_MM, PAGE_W_MM, renderMazePage } from './render/draw';
+import {
+  DrawLayer,
+  DRAW_COLOURS,
+  DRAW_WIDTHS,
+  type DrawLayerHandle,
+} from './DrawLayer';
 import { fileToTreasureDataUrl, loadTreasureImages, mazeTreasures } from './render/images';
 import { downloadBookPdf, downloadMazePdf, type PdfProgress } from './pdf';
 import { detectLang, LANGS, STRINGS, type Lang } from './i18n';
@@ -49,8 +55,14 @@ interface BookEntryState {
 
 let nextId = 1;
 
+/** The preview's backing store. The drawing layer matches it exactly. */
+const PREVIEW_W = 900;
+const PREVIEW_H = Math.round((PREVIEW_W * PAGE_H_MM) / PAGE_W_MM);
+
 /** How long a fresh maze takes to draw itself on, in ms. */
 const INK_MS = 620;
+/** The solution is one stroke and you asked for it — it lands fast. */
+const SOLUTION_MS = 340;
 
 function prefersReducedMotion(): boolean {
   return !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
@@ -80,6 +92,14 @@ export default function App() {
   const [theme, setTheme] = useState<Theme>(INITIAL_THEME);
   /** Night only: a full A4 of white on a dark desk is a glare bomb. */
   const [dimPaper, setDimPaper] = useState(false);
+
+  /** Solving it on the screen, for the tablet on the kitchen table. */
+  const [drawing, setDrawing] = useState(false);
+  const [drawColour, setDrawColour] = useState<string>(DRAW_COLOURS[0]);
+  const [drawWidth, setDrawWidth] = useState<number>(DRAW_WIDTHS[1]);
+  const [erasing, setErasing] = useState(false);
+  const [strokeCount, setStrokeCount] = useState(0);
+  const drawRef = useRef<DrawLayerHandle>(null);
 
   const [difficulty, setDifficulty] = useState<DifficultyId>('medium');
   const [shape, setShape] = useState<ShapeId>('rectangle');
@@ -179,12 +199,17 @@ export default function App() {
   );
 
   const maze = useMemo(() => generateMaze(options), [options]);
+  const sheetKey = [seed, difficulty, shape, entrances, exits, themeId, treasureCount, treasureSize].join('|');
 
   const selectedIndex = book.findIndex((e) => e.id === selectedId);
 
   const previewRef = useRef<HTMLCanvasElement>(null);
-  /** The maze the preview last inked on, so retitling does not redraw it. */
-  const inkedRef = useRef<Maze | null>(null);
+  /** Only the knobs that redraw the whole page are worth re-inking for: a new
+   *  seed, a new size, a new outline. Adding a treasure or a second door
+   *  changes the maze too, but re-drawing the sheet for that is noise. */
+  const inkSig = `${seed}|${difficulty}|${shape}`;
+  const inkedRef = useRef<string | null>(null);
+  const peekedRef = useRef(showSolution);
   const rafRef = useRef<number | null>(null);
 
   useEffect(() => {
@@ -193,8 +218,8 @@ export default function App() {
       const images = await loadTreasureImages(mazeTreasures([maze]));
       if (cancelled || !previewRef.current) return;
       const canvas = previewRef.current;
-      const paint = (ink: number) =>
-        renderMazePage(canvas, maze, 900, {
+      const paint = (ink: number, solutionInk: number) =>
+        renderMazePage(canvas, maze, PREVIEW_W, {
           title,
           difficultyLabel: t.difficulty[maze.options.difficulty],
           showSolution,
@@ -202,27 +227,35 @@ export default function App() {
           dir: dirForLang(lang),
           paper: theme === 'dark' && dimPaper ? '#e7e2d6' : undefined,
           ink,
+          solutionInk,
         });
 
-      // A new maze draws itself on; everything else here (a retitle, the
-      // theme, peeking at the solution) is a repaint of the same maze and
-      // must not restart the animation.
-      const isNewMaze = inkedRef.current !== maze;
-      inkedRef.current = maze;
+      const drawWalls = inkedRef.current !== inkSig;
+      const drawRoute = showSolution && !peekedRef.current;
+      inkedRef.current = inkSig;
+      peekedRef.current = showSolution;
       if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
       rafRef.current = null;
 
-      if (!isNewMaze || prefersReducedMotion()) {
-        paint(1);
+      if ((!drawWalls && !drawRoute) || prefersReducedMotion()) {
+        paint(1, 1);
         return;
       }
 
+      // ease-out: the pen moves fastest at the start, like a real stroke
+      const ease = (p: number) => 1 - (1 - p) ** 3;
       const started = performance.now();
       const step = (now: number) => {
-        const p = Math.min(1, (now - started) / INK_MS);
-        // ease-out: the pen moves fastest at the start, like a real stroke
-        paint(p < 1 ? 1 - (1 - p) ** 3 : 1);
-        rafRef.current = p < 1 && !cancelled ? requestAnimationFrame(step) : null;
+        const elapsed = now - started;
+        const wallP = drawWalls ? Math.min(1, elapsed / INK_MS) : 1;
+        // the route waits for the walls it has to run between
+        const routeStart = drawWalls ? INK_MS * 0.45 : 0;
+        const routeP = drawRoute
+          ? Math.max(0, Math.min(1, (elapsed - routeStart) / SOLUTION_MS))
+          : 1;
+        paint(drawWalls ? ease(wallP) : 1, drawRoute ? ease(routeP) : 1);
+        const done = wallP >= 1 && routeP >= 1;
+        rafRef.current = !done && !cancelled ? requestAnimationFrame(step) : null;
       };
       rafRef.current = requestAnimationFrame(step);
     })();
@@ -231,7 +264,7 @@ export default function App() {
       if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
       rafRef.current = null;
     };
-  }, [maze, title, showSolution, t, lang, theme, dimPaper]);
+  }, [maze, inkSig, title, showSolution, t, lang, theme, dimPaper]);
 
   const shuffle = () => setSeed(Math.floor(Math.random() * 1e9));
 
@@ -350,12 +383,12 @@ export default function App() {
             title={theme === 'dark' ? t.dayMode : t.nightMode}
           >
             {theme === 'dark' ? (
-              <svg viewBox="0 0 24 24" aria-hidden="true">
+              <svg key="sun" viewBox="0 0 24 24" aria-hidden="true">
                 <circle cx="12" cy="12" r="4.4" />
                 <path d="M12 2.8v2.6M12 18.6v2.6M4.5 12H1.9M22.1 12h-2.6M6.7 6.7 4.9 4.9M19.1 19.1l-1.8-1.8M17.3 6.7l1.8-1.8M4.9 19.1l1.8-1.8" />
               </svg>
             ) : (
-              <svg viewBox="0 0 24 24" aria-hidden="true">
+              <svg key="moon" viewBox="0 0 24 24" aria-hidden="true">
                 <path d="M20.4 14.6A8.6 8.6 0 0 1 9.4 3.6a8.6 8.6 0 1 0 11 11Z" />
               </svg>
             )}
@@ -534,6 +567,16 @@ export default function App() {
           )}
           <div className="paper">
             <canvas ref={previewRef} className="preview-canvas" />
+            {drawing && (
+              <DrawLayer
+                ref={drawRef}
+                width={PREVIEW_W}
+                height={PREVIEW_H}
+                tool={{ colour: drawColour, width: drawWidth, erasing }}
+                sheetKey={sheetKey}
+                onCountChange={setStrokeCount}
+              />
+            )}
           </div>
           <div className="preview-actions">
             <button className="big-btn" onClick={reroll}>{t.tryAnother}</button>
@@ -548,6 +591,16 @@ export default function App() {
               />
               {t.peekSolution}
             </label>
+            <button
+              className={`big-btn ${drawing ? 'accent' : ''}`}
+              aria-pressed={drawing}
+              onClick={() => {
+                if (!drawing) analytics.drawModeOpened(options);
+                setDrawing(!drawing);
+              }}
+            >
+              {t.drawMode}
+            </button>
             <span className="spacer" />
             <button
               className="big-btn accent"
@@ -568,6 +621,52 @@ export default function App() {
             </button>
             <button className="big-btn" onClick={addToBook}>{t.addToBook}</button>
           </div>
+          {drawing && (
+            <div className="draw-bar">
+              <span className="draw-group" role="group" aria-label={t.drawColour}>
+                {DRAW_COLOURS.map((c) => (
+                  <button
+                    key={c}
+                    className={`swatch ${!erasing && drawColour === c ? 'active' : ''}`}
+                    style={{ background: c }}
+                    aria-label={t.drawColour}
+                    aria-pressed={!erasing && drawColour === c}
+                    onClick={() => {
+                      setDrawColour(c);
+                      setErasing(false);
+                    }}
+                  />
+                ))}
+              </span>
+              <span className="draw-group" role="group" aria-label={t.drawWidth}>
+                {DRAW_WIDTHS.map((w, i) => (
+                  <button
+                    key={w}
+                    className={`nib ${drawWidth === w ? 'active' : ''}`}
+                    aria-label={`${t.drawWidth} ${i + 1}`}
+                    aria-pressed={drawWidth === w}
+                    onClick={() => setDrawWidth(w)}
+                  >
+                    <span style={{ width: 5 + i * 5, height: 5 + i * 5 }} />
+                  </button>
+                ))}
+              </span>
+              <button
+                className={`draw-btn ${erasing ? 'active' : ''}`}
+                aria-pressed={erasing}
+                onClick={() => setErasing(!erasing)}
+              >
+                {t.drawEraser}
+              </button>
+              <button className="draw-btn" disabled={!strokeCount} onClick={() => drawRef.current?.undo()}>
+                {t.drawUndo}
+              </button>
+              <button className="draw-btn" disabled={!strokeCount} onClick={() => drawRef.current?.clear()}>
+                {t.drawClear}
+              </button>
+              <span className="draw-note">{t.drawHint}</span>
+            </div>
+          )}
           <div className="preview-opts">
             <label className="toggle small">
               <input
