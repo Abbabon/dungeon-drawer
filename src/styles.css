@@ -120,6 +120,21 @@
   --danger: #ef8a7f;
 }
 
+/* Day <-> night is a dissolve, not a cut: these surfaces only ever change
+   colour when the theme does, so the transition costs nothing elsewhere. */
+body,
+.controls,
+.book-shelf.card,
+.preview-actions,
+.paper,
+.thumb,
+.text-input,
+.row select,
+.editing-note {
+  transition: background-color 420ms var(--ease), border-color 420ms var(--ease),
+    color 420ms var(--ease), box-shadow 420ms var(--ease);
+}
+
 body {
   margin: 0;
   font-family: 'Avenir Next', 'Avenir', 'Segoe UI', 'Trebuchet MS', system-ui, sans-serif;
@@ -173,7 +188,12 @@ body {
   justify-content: center;
   padding: 0;
 }
+@keyframes theme-icon-in {
+  from { opacity: 0; transform: rotate(-70deg) scale(0.6); }
+  to { opacity: 1; transform: none; }
+}
 .theme-toggle svg {
+  animation: theme-icon-in 380ms var(--ease);
   width: 19px;
   height: 19px;
   fill: none;
@@ -448,9 +468,7 @@ body {
   box-shadow: var(--paper-shadow);
   overflow: hidden;
   transform: rotate(-0.35deg);
-  transition: box-shadow 220ms var(--ease), transform 220ms var(--ease);
 }
-.paper:hover { transform: rotate(0deg); }
 .preview-canvas {
   display: block;
   width: auto;
@@ -533,8 +551,11 @@ body {
 
 @media (prefers-reduced-motion: reduce) {
   * { transition-duration: 1ms !important; }
+  body, .controls, .book-shelf.card, .preview-actions, .paper, .thumb,
+  .text-input, .row select, .editing-note { transition-duration: 1ms; }
+  .theme-toggle svg { animation: none; }
   .pill:hover, .shape:hover, .theme:hover, .upload-btn:hover, .big-btn:hover,
   .thumb:hover, .chip-pick:hover img, .chip-remove:hover, .thumb-bar button:hover,
-  .lang-select:hover, .theme-toggle:hover, .paper:hover { transform: none; }
+  .lang-select:hover, .theme-toggle:hover { transform: none; }
   .spinner { animation-duration: 2.4s; }
 }
