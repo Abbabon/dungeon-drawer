@@ -65,6 +65,13 @@ export interface Strings {
   dayMode: string;
   dimPaper: string;
   dimPaperHint: string;
+  drawMode: string;
+  drawHint: string;
+  drawColour: string;
+  drawWidth: string;
+  drawEraser: string;
+  drawUndo: string;
+  drawClear: string;
 }
 
 export const STRINGS: Record<Lang, Strings> = {
@@ -121,6 +128,13 @@ export const STRINGS: Record<Lang, Strings> = {
     dayMode: 'Day mode',
     dimPaper: 'Dim the paper',
     dimPaperHint: 'Only on screen — the PDF still prints pure white.',
+    drawMode: '✏️ Draw on it',
+    drawHint: 'Solve it here on the screen. Your drawing stays on this page — the PDF prints clean.',
+    drawColour: 'Colour',
+    drawWidth: 'Line width',
+    drawEraser: 'Eraser',
+    drawUndo: 'Undo',
+    drawClear: 'Clear drawing',
   },
   he: {
     appTitle: 'מצייר מבוכים',
@@ -175,6 +189,13 @@ export const STRINGS: Record<Lang, Strings> = {
     dayMode: 'מצב יום',
     dimPaper: 'להנמיך את בהירות הדף',
     dimPaperHint: 'רק על המסך — ה‑PDF עדיין מודפס על לבן מלא.',
+    drawMode: '✏️ לצייר עליו',
+    drawHint: 'אפשר לפתור כאן על המסך. הציור נשאר בדף הזה — ה‑PDF יודפס נקי.',
+    drawColour: 'צבע',
+    drawWidth: 'עובי הקו',
+    drawEraser: 'מחק',
+    drawUndo: 'ביטול',
+    drawClear: 'לנקות את הציור',
   },
   es: {
     appTitle: 'Dungeon Drawer',
@@ -229,6 +250,13 @@ export const STRINGS: Record<Lang, Strings> = {
     dayMode: 'Modo día',
     dimPaper: 'Atenuar el papel',
     dimPaperHint: 'Solo en pantalla: el PDF se sigue imprimiendo en blanco puro.',
+    drawMode: '✏️ Dibuja encima',
+    drawHint: 'Resuélvelo aquí en la pantalla. Tu dibujo se queda en esta página: el PDF se imprime limpio.',
+    drawColour: 'Color',
+    drawWidth: 'Grosor',
+    drawEraser: 'Borrador',
+    drawUndo: 'Deshacer',
+    drawClear: 'Borrar el dibujo',
   },
   fr: {
     appTitle: 'Dungeon Drawer',
@@ -283,6 +311,13 @@ export const STRINGS: Record<Lang, Strings> = {
     dayMode: 'Mode jour',
     dimPaper: 'Assombrir le papier',
     dimPaperHint: 'À l’écran seulement — le PDF s’imprime toujours en blanc pur.',
+    drawMode: '✏️ Dessiner dessus',
+    drawHint: 'Résolvez-le ici à l’écran. Votre dessin reste sur cette page — le PDF s’imprime vierge.',
+    drawColour: 'Couleur',
+    drawWidth: 'Épaisseur',
+    drawEraser: 'Gomme',
+    drawUndo: 'Annuler',
+    drawClear: 'Effacer le dessin',
   },
   de: {
     appTitle: 'Dungeon Drawer',
@@ -337,6 +372,13 @@ export const STRINGS: Record<Lang, Strings> = {
     dayMode: 'Tagmodus',
     dimPaper: 'Papier abdunkeln',
     dimPaperHint: 'Nur am Bildschirm — das PDF druckt weiterhin reinweiß.',
+    drawMode: '✏️ Darauf malen',
+    drawHint: 'Löse es hier am Bildschirm. Deine Zeichnung bleibt auf dieser Seite — das PDF druckt sauber.',
+    drawColour: 'Farbe',
+    drawWidth: 'Strichstärke',
+    drawEraser: 'Radierer',
+    drawUndo: 'Rückgängig',
+    drawClear: 'Zeichnung löschen',
   },
 };
 

@@ -5,7 +5,8 @@ import type { Lang } from './i18n';
 /**
  * Funnel we care about (each step is a named event, page views are automatic):
  *
- *   visit  →  engage (maze_rerolled / solution_peeked / pictures_uploaded)
+ *   visit  →  engage (maze_rerolled / solution_peeked / draw_mode_opened /
+ *                     pictures_uploaded)
  *          →  convert (pdf_downloaded)
  *          →  deepen (book_maze_added → book_downloaded)
  *
@@ -35,6 +36,11 @@ function mazeProps(options: MazeOptions): Props {
 }
 
 export const analytics = {
+  /** engagement: user opened draw mode to solve it on the screen */
+  drawModeOpened(options: MazeOptions): void {
+    send('draw_mode_opened', { difficulty: options.difficulty, shape: options.shape });
+  },
+
   /** engagement: user hit 🎲 to explore variations */
   mazeRerolled(options: MazeOptions): void {
     send('maze_rerolled', { difficulty: options.difficulty, shape: options.shape });
