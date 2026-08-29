@@ -1,13 +1,22 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { generateMaze } from './maze/generate';
-import type { DifficultyId, MazeOptions, ShapeId, Treasure } from './maze/types';
+import type { DifficultyId, Maze, MazeOptions, ShapeId, Treasure } from './maze/types';
 import { DIFFICULTIES } from './maze/types';
 import { renderMazePage } from './render/draw';
 import { fileToTreasureDataUrl, loadTreasureImages, mazeTreasures } from './render/images';
 import { downloadBookPdf, downloadMazePdf, type PdfProgress } from './pdf';
 import { detectLang, LANGS, STRINGS, type Lang } from './i18n';
 import { applyShareHead, dirForLang, langFromLocation, pathForLang } from './share';
-import { loadState, readLangCookie, saveState, writeLangCookie, type StoredImage } from './persist';
+import {
+  loadState,
+  readLangCookie,
+  readThemeCookie,
+  saveState,
+  writeLangCookie,
+  writeThemeCookie,
+  type StoredImage,
+  type Theme,
+} from './persist';
 import { analytics } from './analytics';
 
 interface TreasureTheme {
@@ -23,12 +32,13 @@ const THEMES: TreasureTheme[] = [
   { id: 'ocean', emojis: ['🐠', '🐙', '🦀', '🐚', '🐬'] },
 ];
 
-const SHAPE_CHOICES: { id: ShapeId; icon: string }[] = [
-  { id: 'rectangle', icon: '⬜' },
-  { id: 'circle', icon: '🔵' },
-  { id: 'heart', icon: '❤️' },
-  { id: 'star', icon: '⭐' },
-  { id: 'hexagon', icon: '⬢' },
+/** One stroke set on a 24px grid, so the five shapes finally read as siblings. */
+const SHAPE_CHOICES: { id: ShapeId; path: string }[] = [
+  { id: 'rectangle', path: 'M6.5 5.5h11a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-11a2 2 0 0 1-2-2v-9a2 2 0 0 1 2-2Z' },
+  { id: 'circle', path: 'M12 4.6a7.4 7.4 0 1 1 0 14.8 7.4 7.4 0 0 1 0-14.8Z' },
+  { id: 'heart', path: 'M12 19.2s-6.6-4.1-6.6-8.5A3.5 3.5 0 0 1 12 8.5a3.5 3.5 0 0 1 6.6 2.2c0 4.4-6.6 8.5-6.6 8.5Z' },
+  { id: 'star', path: 'm12 4.4 2.3 4.9 5.3.7-3.9 3.7 1 5.3-4.7-2.6-4.7 2.6 1-5.3-3.9-3.7 5.3-.7Z' },
+  { id: 'hexagon', path: 'M12 4.2 19 8.1v7.8L12 19.8 5 15.9V8.1Z' },
 ];
 
 interface BookEntryState {
@@ -38,6 +48,13 @@ interface BookEntryState {
 }
 
 let nextId = 1;
+
+/** How long a fresh maze takes to draw itself on, in ms. */
+const INK_MS = 620;
+
+function prefersReducedMotion(): boolean {
+  return !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+}
 
 /** Which theme button a stored page's treasures came from, or null if we can't
  *  tell — no treasures, an emoji that has since left the palette, or pictures
@@ -51,11 +68,18 @@ function themeIdOf(treasures: Treasure[], customImages: StoredImage[]): string |
 
 /** URL wins (a shared link is explicit), then the cookie, then the browser. */
 const INITIAL_LANG: Lang = langFromLocation(window.location) ?? readLangCookie() ?? detectLang();
+/** An explicit choice wins; otherwise follow the system, like index.html did. */
+const INITIAL_THEME: Theme =
+  readThemeCookie() ??
+  (window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
 const STORED = loadState();
 
 export default function App() {
   const [lang, setLang] = useState<Lang>(INITIAL_LANG);
   const t = STRINGS[lang];
+  const [theme, setTheme] = useState<Theme>(INITIAL_THEME);
+  /** Night only: a full A4 of white on a dark desk is a glare bomb. */
+  const [dimPaper, setDimPaper] = useState(false);
 
   const [difficulty, setDifficulty] = useState<DifficultyId>('medium');
   const [shape, setShape] = useState<ShapeId>('rectangle');
@@ -89,6 +113,11 @@ export default function App() {
     null,
   );
   const buildingRef = useRef(false);
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme;
+    writeThemeCookie(theme);
+  }, [theme]);
 
   // Language lives in three places at once: the document (lang/dir + share
   // tags), a cookie for the next visit, and the URL so a copied link carries it.
@@ -154,23 +183,55 @@ export default function App() {
   const selectedIndex = book.findIndex((e) => e.id === selectedId);
 
   const previewRef = useRef<HTMLCanvasElement>(null);
+  /** The maze the preview last inked on, so retitling does not redraw it. */
+  const inkedRef = useRef<Maze | null>(null);
+  const rafRef = useRef<number | null>(null);
+
   useEffect(() => {
     let cancelled = false;
     (async () => {
       const images = await loadTreasureImages(mazeTreasures([maze]));
       if (cancelled || !previewRef.current) return;
-      renderMazePage(previewRef.current, maze, 900, {
-        title,
-        difficultyLabel: t.difficulty[maze.options.difficulty],
-        showSolution,
-        images,
-        dir: dirForLang(lang),
-      });
+      const canvas = previewRef.current;
+      const paint = (ink: number) =>
+        renderMazePage(canvas, maze, 900, {
+          title,
+          difficultyLabel: t.difficulty[maze.options.difficulty],
+          showSolution,
+          images,
+          dir: dirForLang(lang),
+          paper: theme === 'dark' && dimPaper ? '#e7e2d6' : undefined,
+          ink,
+        });
+
+      // A new maze draws itself on; everything else here (a retitle, the
+      // theme, peeking at the solution) is a repaint of the same maze and
+      // must not restart the animation.
+      const isNewMaze = inkedRef.current !== maze;
+      inkedRef.current = maze;
+      if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
+      rafRef.current = null;
+
+      if (!isNewMaze || prefersReducedMotion()) {
+        paint(1);
+        return;
+      }
+
+      const started = performance.now();
+      const step = (now: number) => {
+        const p = Math.min(1, (now - started) / INK_MS);
+        // ease-out: the pen moves fastest at the start, like a real stroke
+        paint(p < 1 ? 1 - (1 - p) ** 3 : 1);
+        rafRef.current = p < 1 && !cancelled ? requestAnimationFrame(step) : null;
+      };
+      rafRef.current = requestAnimationFrame(step);
     })();
     return () => {
       cancelled = true;
+      if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
+      rafRef.current = null;
     };
-  }, [maze, title, showSolution, t, lang]);
+  }, [maze, title, showSolution, t, lang, theme, dimPaper]);
 
   const shuffle = () => setSeed(Math.floor(Math.random() * 1e9));
 
@@ -276,7 +337,29 @@ export default function App() {
   return (
     <div className="app">
       <header className="topbar">
+        <div className="titles">
+          <h1>🏰 {t.appTitle}</h1>
+          <p>{t.tagline}</p>
+        </div>
         <div className="lang-row">
+          <button
+            className="theme-toggle"
+            onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+            aria-pressed={theme === 'dark'}
+            aria-label={theme === 'dark' ? t.dayMode : t.nightMode}
+            title={theme === 'dark' ? t.dayMode : t.nightMode}
+          >
+            {theme === 'dark' ? (
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <circle cx="12" cy="12" r="4.4" />
+                <path d="M12 2.8v2.6M12 18.6v2.6M4.5 12H1.9M22.1 12h-2.6M6.7 6.7 4.9 4.9M19.1 19.1l-1.8-1.8M17.3 6.7l1.8-1.8M4.9 19.1l1.8-1.8" />
+              </svg>
+            ) : (
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M20.4 14.6A8.6 8.6 0 0 1 9.4 3.6a8.6 8.6 0 1 0 11 11Z" />
+              </svg>
+            )}
+          </button>
           <select
             className="lang-select"
             value={lang}
@@ -288,12 +371,19 @@ export default function App() {
             ))}
           </select>
         </div>
-        <h1>🏰 {t.appTitle}</h1>
-        <p>{t.tagline}</p>
       </header>
 
       <div className="layout">
         <aside className="controls">
+          <section className="card">
+            <h2>{t.secName}</h2>
+            <input
+              className="text-input"
+              value={title}
+              maxLength={40}
+              onChange={(e) => setTitle(e.target.value)}
+            />
+          </section>
           <section className="card">
             <h2>{t.secDifficulty}</h2>
             <div className="pill-grid">
@@ -319,28 +409,13 @@ export default function App() {
                   className={`shape ${shape === s.id ? 'active' : ''}`}
                   onClick={() => setShape(s.id)}
                 >
-                  <span className="shape-icon">{s.icon}</span>
+                  <svg className="shape-icon" viewBox="0 0 24 24" aria-hidden="true">
+                    <path d={s.path} />
+                  </svg>
                   <span>{t.shapes[s.id]}</span>
                 </button>
               ))}
             </div>
-          </section>
-
-          <section className="card">
-            <h2>{t.secDoors}</h2>
-            <label className="row">
-              {t.waysIn}
-              <select value={entrances} onChange={(e) => setEntrances(Number(e.target.value))}>
-                {[1, 2, 3].map((n) => <option key={n} value={n}>{n}</option>)}
-              </select>
-            </label>
-            <label className="row">
-              {t.waysOut}
-              <select value={exits} onChange={(e) => setExits(Number(e.target.value))}>
-                {[1, 2, 3].map((n) => <option key={n} value={n}>{n}</option>)}
-              </select>
-            </label>
-            <p className="hint">{t.doorsHint}</p>
           </section>
 
           <section className="card">
@@ -427,17 +502,39 @@ export default function App() {
           </section>
 
           <section className="card">
-            <h2>{t.secName}</h2>
-            <input
-              className="text-input"
-              value={title}
-              maxLength={40}
-              onChange={(e) => setTitle(e.target.value)}
-            />
+            <h2>{t.secDoors}</h2>
+            <div className="door-row">
+              <label className="row">
+                {t.waysIn}
+                <select value={entrances} onChange={(e) => setEntrances(Number(e.target.value))}>
+                  {[1, 2, 3].map((n) => <option key={n} value={n}>{n}</option>)}
+                </select>
+              </label>
+              <label className="row">
+                {t.waysOut}
+                <select value={exits} onChange={(e) => setExits(Number(e.target.value))}>
+                  {[1, 2, 3].map((n) => <option key={n} value={n}>{n}</option>)}
+                </select>
+              </label>
+            </div>
+            <p className="hint">{t.doorsHint}</p>
           </section>
+
         </aside>
 
         <main className="preview-pane">
+          {selectedIndex >= 0 && (
+            <div className="editing-note">
+              <span>{t.editingPage(selectedIndex + 1)}</span>
+              <button className="save" onClick={updateSelectedPage}>
+                {t.updatePage(selectedIndex + 1)}
+              </button>
+              <button onClick={() => setSelectedId(null)}>{t.stopEditing}</button>
+            </div>
+          )}
+          <div className="paper">
+            <canvas ref={previewRef} className="preview-canvas" />
+          </div>
           <div className="preview-actions">
             <button className="big-btn" onClick={reroll}>{t.tryAnother}</button>
             <label className="toggle">
@@ -471,25 +568,25 @@ export default function App() {
             </button>
             <button className="big-btn" onClick={addToBook}>{t.addToBook}</button>
           </div>
-          {selectedIndex >= 0 && (
-            <div className="editing-note">
-              <span>{t.editingPage(selectedIndex + 1)}</span>
-              <button className="save" onClick={updateSelectedPage}>
-                {t.updatePage(selectedIndex + 1)}
-              </button>
-              <button onClick={() => setSelectedId(null)}>{t.stopEditing}</button>
-            </div>
-          )}
-          <label className="toggle small">
-            <input
-              type="checkbox"
-              checked={withSolutionPage}
-              onChange={(e) => setWithSolutionPage(e.target.checked)}
-            />
-            {t.includeSolutionPage}
-          </label>
-          <div className="paper">
-            <canvas ref={previewRef} className="preview-canvas" />
+          <div className="preview-opts">
+            <label className="toggle small">
+              <input
+                type="checkbox"
+                checked={withSolutionPage}
+                onChange={(e) => setWithSolutionPage(e.target.checked)}
+              />
+              {t.includeSolutionPage}
+            </label>
+            {theme === 'dark' && (
+              <label className="toggle small" title={t.dimPaperHint}>
+                <input
+                  type="checkbox"
+                  checked={dimPaper}
+                  onChange={(e) => setDimPaper(e.target.checked)}
+                />
+                {t.dimPaper}
+              </label>
+            )}
           </div>
         </main>
       </div>

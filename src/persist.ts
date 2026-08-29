@@ -31,6 +31,32 @@ export function writeLangCookie(lang: Lang): void {
 }
 
 /* ------------------------------------------------------------------ *
+ * Theme — a cookie too, and for the same reason: it has to be readable
+ * before React mounts. index.html stamps <html data-theme> from it, so the
+ * first paint is already the right colour. A flash of the daylight palette
+ * is exactly what night mode exists to avoid.
+ *
+ * No cookie means "follow the system", which is the default.
+ * ------------------------------------------------------------------ */
+
+const THEME_COOKIE = 'dd_theme';
+
+export type Theme = 'light' | 'dark';
+
+export function readThemeCookie(): Theme | null {
+  const value = readCookie(THEME_COOKIE);
+  return value === 'light' || value === 'dark' ? value : null;
+}
+
+export function writeThemeCookie(theme: Theme): void {
+  try {
+    document.cookie = `${THEME_COOKIE}=${theme}; path=/; max-age=${YEAR_SECONDS}; SameSite=Lax`;
+  } catch {
+    // private mode / cookies blocked — the app still works, it just forgets
+  }
+}
+
+/* ------------------------------------------------------------------ *
  * The maze book and the uploaded pictures — localStorage, not a cookie.
  *
  * A book is a list of {options, seed} snapshots, and uploaded treasures

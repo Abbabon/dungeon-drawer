@@ -52,6 +52,10 @@ Any change to the pipeline must preserve these. `scripts/verify-mazes.ts` sweeps
 
 Treasures are spread along the solution path at evenly spaced indices, nudged apart when the path is too short for the count (up to 10), and any that no longer fit are dropped rather than stacked.
 
+**Theme** (`:root` tokens in `styles.css`, `dd_theme` cookie, `data-theme` on `<html>`). Light is the warm "desk"; dark is the same hue family, not neutral grey. An explicit choice wins in both directions, so the dark tokens are written twice on purpose — once under `prefers-color-scheme` for "system says dark and the user hasn't overridden", once under `[data-theme='dark']` for the toggle. An inline script in `index.html` stamps the attribute *before the first paint*; React mounts far too late, and a flash of the daylight palette is the one thing night mode exists to prevent.
+
+**The theme must never reach the PDF.** `renderMazePage` takes an optional `paper` colour and only the preview passes it (night mode's "dim the paper", so a full A4 of white does not glare at bedtime). Every `pdf.ts` call leaves it undefined and the page prints pure white. This is the same trap as `dir`: a detached canvas cannot inherit document state, and print output must not follow screen chrome.
+
 **Rendering** (`src/render/draw.ts`): the same renderer draws the 900 px preview, 300 px book thumbnails, and 2480 px (~300 dpi A4) PDF pages, so preview = print. Every entry point takes an explicit `dir` — the preview canvas is in the document and inherits `<html dir>`, but a PDF page is drawn on a *detached* canvas that cannot, so without it Hebrew pages printed left-to-right (numbers at the wrong end of the line, title on the wrong side) while the preview looked fine. `dirForLang` in `share.ts` is the single source. Draw order is part of correctness: solution line → treasures → walls on top. Treasure icons must fit inside one cell and never cover a wall.
 
 **PDF assembly** (`src/pdf.ts`): every page is a canvas PNG handed to `jsPDF.addImage` with an explicit `'SLOW'` compression argument. jsPDF stores image data *uncompressed* when that argument is omitted — 26 MB of raw pixels per A4 page, which once produced a 250 MB seven-maze book. Deflate is lossless, so the print is unaffected; never drop the argument.
@@ -83,6 +87,7 @@ The page renders all locales and POSTs each PNG to the writer; the RTL layout is
 **Persistence** (`src/persist.ts`). Two stores, chosen on purpose:
 
 - **Language** — a `dd_lang` cookie, one year, `SameSite=Lax`. Small, and readable outside JS if an edge redirect ever fronts the locale pages.
+- **Theme** — a `dd_theme` cookie (`light` | `dark`), same shape and lifetime. A cookie rather than localStorage for one reason: the no-flash script in `index.html` has to read it synchronously in `<head>`. No cookie means "follow the system".
 - **Book + uploaded pictures** — `localStorage` under `dd_state_v1`, shaped `{ book: { title, solutions, cover, coverText, entries }, images: [{ src, on }] }`. Deliberately *not* a cookie: photos ride along as data URLs and blow past the ~4 KB limit, and a book has no business being sent up with every request.
 
 Entries stay `{options, seed}` snapshots, so a restored book re-generates byte-identical mazes — this is the same determinism contract as above, now load-bearing across sessions too. Everything read back is validated (`parseOptions`, `isDataImage`) because localStorage is user-editable; a bad payload is dropped, never fed to `generateMaze`. `saveState` returns `false` when the browser refuses (quota, private mode) and the UI surfaces `Strings.bookNotSaved` rather than silently forgetting.
